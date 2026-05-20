@@ -41,19 +41,16 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         label: "Ceremonias",
         href: ROUTES.adminCeremonias,
         icon: CalendarDays,
-        comingSoon: true,
       },
       {
         label: "Graduandos",
         href: ROUTES.adminGraduandos,
         icon: GraduationCap,
-        comingSoon: true,
       },
       {
         label: "Invitados",
         href: ROUTES.adminInvitados,
         icon: UsersRound,
-        comingSoon: true,
       },
     ],
   },
@@ -87,7 +84,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         label: "Usuarios",
         href: ROUTES.adminUsuarios,
         icon: Users,
-        comingSoon: true,
       },
       {
         label: "Auditoría",

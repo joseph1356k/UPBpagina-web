@@ -257,3 +257,159 @@ export async function getOverviewStats(): Promise<OverviewStats> {
     ).length,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/*  Admin-specific joined queries                                     */
+/* ------------------------------------------------------------------ */
+
+export interface GuestAdminRow extends Guest {
+  graduateName: string;
+  graduateProgram: string;
+  ceremonyId: string;
+  ceremonyName: string;
+}
+
+export interface GetGuestsAdminArgs {
+  ceremonyId?: string;
+  status?: GuestStatus;
+  query?: string;
+}
+
+export async function getGuestsAdmin(
+  args: GetGuestsAdminArgs = {},
+): Promise<GuestAdminRow[]> {
+  await delay();
+
+  let result: GuestAdminRow[] = guestsSeed.map((g) => {
+    const grad = graduatesSeed.find((gr) => gr.id === g.graduateId);
+    const cer = grad
+      ? ceremoniesSeed.find((c) => c.id === grad.ceremonyId)
+      : undefined;
+    return {
+      ...g,
+      graduateName: grad?.fullName ?? "—",
+      graduateProgram: grad?.program ?? "—",
+      ceremonyId: grad?.ceremonyId ?? "",
+      ceremonyName: cer?.name ?? "—",
+    };
+  });
+
+  if (args.ceremonyId) {
+    result = result.filter((g) => g.ceremonyId === args.ceremonyId);
+  }
+  if (args.status) {
+    result = result.filter((g) => g.status === args.status);
+  }
+  if (args.query) {
+    const q = args.query.toLowerCase();
+    result = result.filter(
+      (g) =>
+        g.fullName.toLowerCase().includes(q) ||
+        g.graduateName.toLowerCase().includes(q) ||
+        (g.documentNumber ?? "").includes(q) ||
+        (g.email ?? "").toLowerCase().includes(q),
+    );
+  }
+
+  return result;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Mutations (in-memory — for mock purposes only)                    */
+/* ------------------------------------------------------------------ */
+
+export type CreateCeremonyInput = Omit<
+  Ceremony,
+  "id" | "createdAt" | "updatedAt"
+>;
+export type UpdateCeremonyInput = Partial<Omit<Ceremony, "id" | "createdAt">>;
+
+export async function createCeremony(
+  data: CreateCeremonyInput,
+): Promise<Ceremony> {
+  await delay();
+  const c: Ceremony = {
+    ...data,
+    id: `cer_${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  ceremoniesSeed.push(c);
+  return c;
+}
+
+export async function updateCeremony(
+  id: string,
+  patch: UpdateCeremonyInput,
+): Promise<Ceremony> {
+  await delay();
+  const idx = ceremoniesSeed.findIndex((c) => c.id === id);
+  if (idx === -1) throw new Error("Ceremonia no encontrada");
+  const updated: Ceremony = {
+    ...ceremoniesSeed[idx],
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+  ceremoniesSeed[idx] = updated;
+  return updated;
+}
+
+export type CreateUserInput = Omit<User, "id" | "createdAt" | "lastSignInAt">;
+export type UpdateUserInput = Partial<Omit<User, "id" | "createdAt">>;
+
+export async function createUser(data: CreateUserInput): Promise<User> {
+  await delay();
+  const u: User = {
+    ...data,
+    id: `usr_${Date.now()}`,
+    lastSignInAt: null,
+    createdAt: new Date().toISOString(),
+  };
+  usersSeed.push(u);
+  return u;
+}
+
+export async function updateUser(
+  id: string,
+  patch: UpdateUserInput,
+): Promise<User> {
+  await delay();
+  const idx = usersSeed.findIndex((u) => u.id === id);
+  if (idx === -1) throw new Error("Usuario no encontrado");
+  const updated: User = { ...usersSeed[idx], ...patch };
+  usersSeed[idx] = updated;
+  return updated;
+}
+
+export type UpdateGraduateAdminInput = Partial<
+  Omit<Graduate, "id" | "ceremonyId" | "createdAt">
+>;
+
+export async function updateGraduateAdmin(
+  id: string,
+  patch: UpdateGraduateAdminInput,
+): Promise<Graduate> {
+  await delay();
+  const idx = graduatesSeed.findIndex((g) => g.id === id);
+  if (idx === -1) throw new Error("Graduando no encontrado");
+  const updated: Graduate = {
+    ...graduatesSeed[idx],
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+  graduatesSeed[idx] = updated;
+  return updated;
+}
+
+export async function revokeGuestAdmin(id: string): Promise<Guest> {
+  await delay();
+  const idx = guestsSeed.findIndex((g) => g.id === id);
+  if (idx === -1) throw new Error("Invitado no encontrado");
+  const updated: Guest = {
+    ...guestsSeed[idx],
+    status: "revoked",
+    updatedAt: new Date().toISOString(),
+  };
+  guestsSeed[idx] = updated;
+  return updated;
+}
