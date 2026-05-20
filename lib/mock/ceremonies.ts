@@ -1,0 +1,57 @@
+import type { Ceremony } from "../types";
+
+/**
+ * 3 ceremonias seed:
+ *   - 2 abiertas (próximas, registro vigente)
+ *   - 1 finalizada (mes pasado, datos históricos)
+ *
+ * IDs son estables — `lib/mock/graduates.ts`, `audit-log.ts`, etc.
+ * referencian estos mismos strings.
+ */
+export const ceremonies: Ceremony[] = [
+  {
+    id: "cer_ing_06_2026",
+    name: "Grados Facultad de Ingenierías — Junio 2026",
+    date: "2026-06-19",
+    startTime: "09:00",
+    endTime: "11:30",
+    venue: "Auditorio Mons. Felipe Estrada Vélez",
+    campus: "Medellín",
+    faculty: "Facultad de Ingenierías",
+    status: "open",
+    registrationClosesAt: "2026-06-12T23:59:59-05:00",
+    maxGuestsDefault: 4,
+    createdAt: "2026-03-12T10:00:00-05:00",
+    updatedAt: "2026-05-15T16:24:00-05:00",
+  },
+  {
+    id: "cer_eco_06_2026",
+    name: "Grados Facultad de Ciencias Económicas — Junio 2026",
+    date: "2026-06-26",
+    startTime: "10:00",
+    endTime: "12:30",
+    venue: "Auditorio Principal UPB Bucaramanga",
+    campus: "Bucaramanga",
+    faculty: "Facultad de Ciencias Económicas, Administrativas y Contables",
+    status: "open",
+    registrationClosesAt: "2026-06-19T23:59:59-05:00",
+    maxGuestsDefault: 3,
+    createdAt: "2026-03-20T10:00:00-05:00",
+    updatedAt: "2026-05-14T11:00:00-05:00",
+  },
+  {
+    id: "cer_sal_04_2026",
+    name: "Grados Facultad de Ciencias de la Salud — Abril 2026",
+    date: "2026-04-18",
+    startTime: "08:30",
+    endTime: "11:00",
+    venue: "Auditorio Mons. Felipe Estrada Vélez",
+    campus: "Medellín",
+    faculty: "Facultad de Ciencias de la Salud",
+    status: "completed",
+    registrationClosesAt: "2026-04-11T23:59:59-05:00",
+    maxGuestsDefault: 4,
+    createdAt: "2026-02-05T10:00:00-05:00",
+    updatedAt: "2026-04-18T15:00:00-05:00",
+  },
+];
