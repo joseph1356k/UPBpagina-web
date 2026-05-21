@@ -13,6 +13,11 @@ const NAV_LINKS = [
 export function PublicHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur-md">
+      {/* Gold accent line — UPB institutional touch */}
+      <div
+        aria-hidden
+        className="h-0.5 bg-gradient-to-r from-primary via-brand-gold to-primary"
+      />
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 md:px-8">
         <BrandMark size="md" />
         <nav

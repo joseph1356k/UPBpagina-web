@@ -21,6 +21,11 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
         className,
       )}
     >
+      {/* Gold accent line — UPB institutional touch */}
+      <div
+        aria-hidden
+        className="h-0.5 shrink-0 bg-gradient-to-r from-primary via-brand-gold to-primary"
+      />
       <div className="flex items-center justify-between border-b border-sidebar-border px-5 py-4">
         <BrandMark size="md" href="/admin" />
       </div>

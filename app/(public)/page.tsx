@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { StatCard } from "@/components/shared/stat-card";
+import { UpbShield } from "@/components/shared/upb-shield";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ROUTES } from "@/lib/constants";
@@ -37,40 +38,77 @@ export default function LandingPage() {
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden">
+    <section className="relative overflow-hidden upb-warm-bg">
       <div
-        className="grid-bg pointer-events-none absolute inset-0 opacity-40"
+        className="grid-bg pointer-events-none absolute inset-0 opacity-30"
         aria-hidden
       />
-      <div className="relative mx-auto max-w-6xl px-4 pt-20 pb-20 md:px-8 md:pt-28 md:pb-24">
-        <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-background/60 px-3 py-1 text-[0.72rem] font-medium uppercase tracking-[0.2em] text-primary backdrop-blur">
-          <Sparkles className="size-3.5" />
-          Universidad Pontificia Bolivariana · Plataforma de grados
-        </p>
-        <h1 className="max-w-4xl text-balance font-serif text-4xl font-semibold leading-[1.05] tracking-tight md:text-[3.4rem] lg:text-[3.75rem]">
-          Registro de invitados a ceremonias de grado,{" "}
-          <span className="text-primary">sin filas</span> y con trazabilidad.
-        </h1>
-        <p className="mt-7 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-          Una plataforma institucional para que los graduandos registren a sus
-          invitados desde cualquier lugar, reciban invitaciones digitales con
-          QR único, y el día del evento UPB valide cada ingreso en segundos.
-        </p>
-        <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-          <Button asChild size="lg">
-            <Link href={ROUTES.registro}>
-              Registrar mis invitados
-              <ArrowRight className="size-4" />
-            </Link>
-          </Button>
-          <Button asChild size="lg" variant="outline">
-            <Link href="#como-funciona">Ver cómo funciona</Link>
-          </Button>
+      {/* Decorative gold ribbon at top */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-brand-gold to-transparent opacity-70"
+      />
+
+      <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pt-20 pb-20 md:px-8 md:pt-28 md:pb-24 lg:grid-cols-[1.5fr_1fr]">
+        {/* Copy */}
+        <div>
+          <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-1 text-[0.7rem] font-medium uppercase tracking-[0.2em] text-primary backdrop-blur">
+            <Sparkles className="size-3.5" />
+            Universidad Pontificia Bolivariana · Plataforma de grados
+          </p>
+          <h1 className="max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.05] tracking-tight md:text-[3.4rem] lg:text-[3.6rem]">
+            Registro de invitados a ceremonias de grado,{" "}
+            <span className="relative">
+              <span className="relative z-10 text-primary">sin filas</span>
+              <span
+                aria-hidden
+                className="absolute inset-x-0 bottom-1 h-2 bg-brand-gold/40 -z-0"
+              />
+            </span>{" "}
+            y con trazabilidad.
+          </h1>
+          <p className="mt-7 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
+            Una plataforma institucional para que los graduandos registren a sus
+            invitados desde cualquier lugar, reciban invitaciones digitales con
+            QR único, y el día del evento UPB valide cada ingreso en segundos.
+          </p>
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <Button asChild size="lg">
+              <Link href={ROUTES.registro}>
+                Registrar mis invitados
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="#como-funciona">Ver cómo funciona</Link>
+            </Button>
+          </div>
+          <p className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="size-3.5" />
+            Tus datos se tratan según la Ley 1581 de 2012 de protección de datos.
+          </p>
         </div>
-        <p className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
-          <ShieldCheck className="size-3.5" />
-          Tus datos se tratan según la Ley 1581 de 2012 de protección de datos.
-        </p>
+
+        {/* UPB shield emblem */}
+        <div className="relative hidden lg:flex lg:justify-center">
+          <div
+            aria-hidden
+            className="absolute inset-0 m-auto size-72 rounded-full bg-brand-gold/15 blur-3xl"
+          />
+          <div className="relative flex flex-col items-center gap-4 rounded-3xl border border-border/70 bg-card/80 px-10 py-10 shadow-sm backdrop-blur">
+            <UpbShield className="size-44 drop-shadow-sm" />
+            <div className="text-center">
+              <p className="font-serif text-base font-semibold leading-tight text-foreground">
+                Universidad Pontificia
+                <br />
+                Bolivariana
+              </p>
+              <p className="mt-1.5 text-[0.65rem] font-medium uppercase tracking-[0.22em] text-muted-foreground">
+                Desde 1936
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
