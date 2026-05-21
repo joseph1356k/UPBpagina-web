@@ -1,0 +1,63 @@
+# Supabase CLI configuration — UPB Ceremonias
+# Docs: https://supabase.com/docs/guides/cli/config
+
+project_id = "upb-ceremonias"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+
+[realtime]
+enabled = false  # not needed for this app
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true   # local email inbox for OTP testing during dev
+port = 54324
+
+[storage]
+enabled = false  # not used yet
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = [
+  "http://localhost:3000/registro/verificacion",
+  "https://*.vercel.app",
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = false  # admin creates accounts; graduates auto-provision via API
+
+[auth.email]
+enable_signup = false
+double_confirm_changes = true
+enable_confirmations = false  # OTP, not confirmation links
+secure_password_change = false
+
+[auth.email.template.recovery]
+subject = "Recupera tu acceso · UPB Ceremonias"
+
+[auth.email.template.magic_link]
+subject = "Tu código de acceso · UPB Ceremonias"
+
+[auth.sms]
+enable_signup = false
+
+[edge_runtime]
+enabled = false  # using Next.js API routes instead
