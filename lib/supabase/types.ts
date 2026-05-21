@@ -317,6 +317,14 @@ export interface Database {
         Args: { p_token: string };
         Returns: string | null;
       };
+      graduate_revoke_session: {
+        Args: { p_token: string };
+        Returns: void;
+      };
+      touch_user_login: {
+        Args: { p_user_id: string };
+        Returns: void;
+      };
       is_staff: {
         Args: { p_roles?: UserRoleDb[] };
         Returns: boolean;

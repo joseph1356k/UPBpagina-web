@@ -5,11 +5,14 @@
  * Resp:  { ok: true, graduateId: string, maskedEmail: string }
  *        | { ok: false, error: "not_found" | "not_eligible" | "rate_limit" }
  *
- * Flow:
- *   1. Look up graduate by document
- *   2. Generate OTP via Postgres function (hashed in DB)
- *   3. Email plain code via Resend
- *   4. Return graduateId so the client can call verify-otp
+ * Defenses (in order):
+ *   1. IP rate-limit (10/min) — block scrapers cheaply
+ *   2. CSRF (same-origin check)
+ *   3. zod validation
+ *   4. DB rate-limit (5/15min per document) — backstop
+ *
+ * The OTP is generated server-side (CSPRNG) and stored hashed; only the
+ * plaintext email body sees it.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -17,46 +20,44 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { USE_SUPABASE } from "@/lib/supabase/env";
 import { otpEmailTemplate, sendEmail } from "@/lib/email";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { assertSameOrigin } from "@/lib/security/csrf";
+import { parseJson, SendOtpBody } from "@/lib/security/schemas";
 
 export async function POST(request: NextRequest) {
   if (!USE_SUPABASE) {
-    return NextResponse.json(
-      { ok: false, error: "mock_mode" },
-      {
-        status: 501,
-        statusText:
-          "API route is a no-op in mock mode. Set NEXT_PUBLIC_USE_SUPABASE=true.",
-      },
-    );
+    return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
 
-  let body: { documentNumber?: unknown };
-  try {
-    body = (await request.json()) as { documentNumber?: unknown };
-  } catch {
-    return NextResponse.json({ ok: false, error: "invalid_body" }, { status: 400 });
-  }
-  const doc =
-    typeof body.documentNumber === "string"
-      ? body.documentNumber.replace(/\D/g, "")
-      : "";
-  if (!doc || doc.length < 6 || doc.length > 12) {
+  // 1. IP-based rate limit (10 per minute per IP)
+  const rl = rateLimit(request, "send-otp", { max: 10, windowMs: 60_000 });
+  if (!rl.ok) return rl.response;
+
+  // 2. CSRF
+  const csrf = assertSameOrigin(request);
+  if (!csrf.ok) return csrf.response;
+
+  // 3. Validate body
+  const parsed = await parseJson(request, SendOtpBody);
+  if (!parsed.ok) {
     return NextResponse.json(
-      { ok: false, error: "validation_doc_number" },
+      { ok: false, error: "validation_doc_number", detail: parsed.error },
       { status: 400 },
     );
   }
+  const { documentNumber } = parsed.data;
 
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
+  // 4. DB-level rate limit + OTP generation (atomic)
   const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("graduate_generate_otp", {
-    p_document_number: doc,
+    p_document_number: documentNumber,
     p_ip: ip,
   });
   if (error) {
-    console.error("[send-otp] rpc error:", error);
+    console.error("[send-otp] rpc error:", error.message);
     return NextResponse.json({ ok: false, error: "unknown" }, { status: 500 });
   }
 
@@ -76,10 +77,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Send email (logs to console if RESEND_API_KEY missing)
   if (!rpc.email || !rpc.code || !rpc.graduateId || !rpc.graduateName) {
     return NextResponse.json({ ok: false, error: "unknown" }, { status: 500 });
   }
+
   try {
     const tpl = otpEmailTemplate({
       graduateName: rpc.graduateName,
@@ -88,7 +89,11 @@ export async function POST(request: NextRequest) {
     });
     await sendEmail({ to: rpc.email, ...tpl });
   } catch (err) {
-    console.error("[send-otp] email send failed:", err);
+    // Log without leaking the email address
+    console.error(
+      "[send-otp] email send failed:",
+      err instanceof Error ? err.message : "unknown",
+    );
     return NextResponse.json(
       { ok: false, error: "email_failed" },
       { status: 502 },

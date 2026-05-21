@@ -430,10 +430,13 @@ export type UpdateUserInput = Partial<Omit<User, "id" | "createdAt">>;
  */
 export async function createUser(data: CreateUserInput): Promise<User> {
   const service = createServiceClient();
+  // SECURITY: app_metadata is admin-only (set via service role).
+  // NEVER use user_metadata for is_staff/role — that field is user-editable
+  // and would let anyone become admin if signup is ever enabled.
   const { data: authUser, error: authErr } = await service.auth.admin.createUser({
     email: data.email,
     email_confirm: true,
-    user_metadata: {
+    app_metadata: {
       is_staff: true,
       full_name: data.fullName,
       role: data.role,

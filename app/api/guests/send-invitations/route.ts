@@ -18,6 +18,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { USE_SUPABASE } from "@/lib/supabase/env";
 import { invitationEmailTemplate, sendEmail } from "@/lib/email";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { assertSameOrigin } from "@/lib/security/csrf";
+import { parseJson, SendInvitationsBody } from "@/lib/security/schemas";
 import { GRADUATE_SESSION_COOKIE } from "../../auth/graduate/verify-otp/route";
 import { formatDateLong, formatTime } from "@/lib/format";
 
@@ -29,17 +32,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "mock_mode" }, { status: 501 });
   }
 
-  let body: { graduateId?: unknown };
-  try {
-    body = (await request.json()) as { graduateId?: unknown };
-  } catch {
+  // 1. Rate limit (5/min — guards against bulk email abuse)
+  const rl = rateLimit(request, "send-invitations", { max: 5, windowMs: 60_000 });
+  if (!rl.ok) return rl.response;
+
+  // 2. CSRF
+  const csrf = assertSameOrigin(request);
+  if (!csrf.ok) return csrf.response;
+
+  // 3. Validate body
+  const parsed = await parseJson(request, SendInvitationsBody);
+  if (!parsed.ok) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
-  const graduateId =
-    typeof body.graduateId === "string" ? body.graduateId : "";
-  if (!graduateId) {
-    return NextResponse.json({ error: "invalid_body" }, { status: 400 });
-  }
+  const { graduateId } = parsed.data;
 
   // ── Authorize ────────────────────────────────────────────────────
   let authorized = false;

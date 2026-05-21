@@ -7,20 +7,27 @@
  * Calls the anon-callable Postgres function `get_invitation_by_token`.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { USE_SUPABASE } from "@/lib/supabase/env";
+import { rateLimit } from "@/lib/security/rate-limit";
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ) {
   if (!USE_SUPABASE) {
     return NextResponse.json({ error: "mock_mode" }, { status: 501 });
   }
+
+  // Rate-limit anonymous token lookups to deter token-enumeration scans
+  const rl = rateLimit(request, "invitation-lookup", { max: 30, windowMs: 60_000 });
+  if (!rl.ok) return rl.response;
+
   const { token } = await params;
-  if (!token) {
+  // Strict token format: alphanumeric + dash/underscore, 16-128 chars
+  if (!token || !/^[a-zA-Z0-9_-]{16,128}$/.test(token)) {
     return NextResponse.json({ error: "invalid_token" }, { status: 400 });
   }
 
