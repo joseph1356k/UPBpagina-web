@@ -1,0 +1,27 @@
+{
+  "name": "UPB Ceremonias",
+  "short_name": "UPB Ceremonias",
+  "description": "Plataforma institucional de la Universidad Pontificia Bolivariana para el registro y validación de invitados en ceremonias de grado.",
+  "lang": "es-CO",
+  "start_url": "/scanner",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1a14",
+  "theme_color": "#0d1a14",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["education", "productivity", "business"]
+}

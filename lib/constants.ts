@@ -37,6 +37,9 @@ export const ROUTES = {
   adminReportes: "/admin/reportes",
   adminConfiguracion: "/admin/configuracion",
 
+  // Public invitation
+  invitacion: "/invitacion",
+
   // Scanner
   scanner: "/scanner",
   scannerHistorial: "/scanner/historial",

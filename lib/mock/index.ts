@@ -17,6 +17,7 @@ import type {
   GraduateStatus,
   Guest,
   GuestStatus,
+  ScanDeniedReason,
   ScanEvent,
   ScanResult,
   User,
@@ -399,6 +400,219 @@ export async function updateGraduateAdmin(
   };
   graduatesSeed[idx] = updated;
   return updated;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Invitation token lookup                                           */
+/* ------------------------------------------------------------------ */
+
+export interface InvitationView {
+  guest: Guest;
+  graduate: Graduate;
+  ceremony: Ceremony;
+  /** Reason the QR cannot be used right now, if any. */
+  blocked?: "revoked" | "ceremony_completed";
+}
+
+export async function getInvitationByToken(
+  token: string,
+): Promise<InvitationView | null> {
+  await delay();
+  const guest = guestsSeed.find((g) => g.invitationToken === token);
+  if (!guest) return null;
+  const graduate = graduatesSeed.find((g) => g.id === guest.graduateId);
+  if (!graduate) return null;
+  const ceremony = ceremoniesSeed.find((c) => c.id === graduate.ceremonyId);
+  if (!ceremony) return null;
+
+  let blocked: InvitationView["blocked"];
+  if (guest.status === "revoked") blocked = "revoked";
+  else if (ceremony.status === "completed" && guest.status !== "checked_in")
+    blocked = "ceremony_completed";
+
+  return { guest, graduate, ceremony, blocked };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scanner simulation                                                 */
+/* ------------------------------------------------------------------ */
+
+export interface SimulatedScanResult {
+  result: ScanResult;
+  reason: ScanDeniedReason | null;
+  guest: Guest | null;
+  graduate: Graduate | null;
+  ceremonyName: string | null;
+  scanEvent: ScanEvent;
+}
+
+/**
+ * Picks a random "candidate" guest and produces a realistic scan outcome:
+ *   - 70% allowed  (status changes to checked_in, event recorded)
+ *   - 15% already_used (guest was already checked in)
+ *   - 10% revoked
+ *   -  5% not_found  (unknown token simulated)
+ */
+export async function simulateScan(args: {
+  scannedByUserId: string;
+  ceremonyId?: string;
+}): Promise<SimulatedScanResult> {
+  await delay();
+  const now = new Date().toISOString();
+  const r = Math.random();
+
+  // Pool of guests filtered by ceremony if requested
+  const ceremonyGradIds = args.ceremonyId
+    ? new Set(
+        graduatesSeed
+          .filter((g) => g.ceremonyId === args.ceremonyId)
+          .map((g) => g.id),
+      )
+    : null;
+  const inPool = (g: Guest) =>
+    ceremonyGradIds ? ceremonyGradIds.has(g.graduateId) : true;
+
+  let result: ScanResult = "allowed";
+  let reason: ScanDeniedReason | null = null;
+  let guest: Guest | null = null;
+
+  if (r < 0.05) {
+    // not_found: simulate unknown token
+    result = "denied";
+    reason = "not_found";
+  } else if (r < 0.15) {
+    // revoked
+    const candidates = guestsSeed.filter(
+      (g) => g.status === "revoked" && inPool(g),
+    );
+    guest =
+      candidates[Math.floor(Math.random() * candidates.length)] ?? null;
+    if (guest) {
+      result = "denied";
+      reason = "revoked";
+    } else {
+      result = "denied";
+      reason = "not_found";
+    }
+  } else if (r < 0.3) {
+    // already_used
+    const candidates = guestsSeed.filter(
+      (g) => g.status === "checked_in" && inPool(g),
+    );
+    guest =
+      candidates[Math.floor(Math.random() * candidates.length)] ?? null;
+    if (guest) {
+      result = "denied";
+      reason = "already_used";
+    } else {
+      result = "denied";
+      reason = "not_found";
+    }
+  } else {
+    // allowed
+    const candidates = guestsSeed.filter(
+      (g) => g.status === "invited" && inPool(g),
+    );
+    guest =
+      candidates[Math.floor(Math.random() * candidates.length)] ?? null;
+    if (guest) {
+      result = "allowed";
+      const idx = guestsSeed.findIndex((g) => g.id === guest!.id);
+      guestsSeed[idx] = {
+        ...guestsSeed[idx],
+        status: "checked_in",
+        checkedInAt: now,
+        updatedAt: now,
+      };
+      guest = guestsSeed[idx];
+    } else {
+      // Fallback if there are no invited guests left
+      const checkedIn = guestsSeed.filter(
+        (g) => g.status === "checked_in" && inPool(g),
+      );
+      guest =
+        checkedIn[Math.floor(Math.random() * checkedIn.length)] ?? null;
+      result = "denied";
+      reason = guest ? "already_used" : "not_found";
+    }
+  }
+
+  const graduate =
+    guest && graduatesSeed.find((g) => g.id === guest!.graduateId)
+      ? graduatesSeed.find((g) => g.id === guest!.graduateId)!
+      : null;
+  const ceremonyName = graduate
+    ? ceremoniesSeed.find((c) => c.id === graduate.ceremonyId)?.name ?? null
+    : null;
+
+  const scanEvent: ScanEvent = {
+    id: `scn_${Date.now()}`,
+    guestId: guest?.id ?? null,
+    scannedByUserId: args.scannedByUserId,
+    scannedAt: now,
+    result,
+    reason,
+  };
+  scanEventsSeed.unshift(scanEvent);
+
+  return { result, reason, guest, graduate, ceremonyName, scanEvent };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Reports helpers                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface ScanEventRow extends ScanEvent {
+  guestName: string | null;
+  graduateName: string | null;
+  ceremonyName: string | null;
+  scannedByName: string;
+  scannedByRole: string;
+}
+
+export async function getScanEventsAdmin(): Promise<ScanEventRow[]> {
+  await delay();
+  return scanEventsSeed
+    .map((e) => {
+      const guest = e.guestId
+        ? guestsSeed.find((g) => g.id === e.guestId) ?? null
+        : null;
+      const graduate = guest
+        ? graduatesSeed.find((g) => g.id === guest.graduateId) ?? null
+        : null;
+      const ceremony = graduate
+        ? ceremoniesSeed.find((c) => c.id === graduate.ceremonyId)
+        : undefined;
+      const operator = usersSeed.find((u) => u.id === e.scannedByUserId);
+      return {
+        ...e,
+        guestName: guest?.fullName ?? null,
+        graduateName: graduate?.fullName ?? null,
+        ceremonyName: ceremony?.name ?? null,
+        scannedByName: operator?.fullName ?? "Operador desconocido",
+        scannedByRole: operator?.role ?? "scanner",
+      };
+    })
+    .sort((a, b) => b.scannedAt.localeCompare(a.scannedAt));
+}
+
+export interface AuditLogRow extends AuditEntry {
+  actorName: string;
+  actorRole: string;
+}
+
+export async function getAuditLogAdmin(): Promise<AuditLogRow[]> {
+  await delay();
+  return [...auditLogSeed]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .map((e) => {
+      const actor = usersSeed.find((u) => u.id === e.actorId);
+      return {
+        ...e,
+        actorName: actor?.fullName ?? "Sistema",
+        actorRole: actor?.role ?? "system",
+      };
+    });
 }
 
 export async function revokeGuestAdmin(id: string): Promise<Guest> {
