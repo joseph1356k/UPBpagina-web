@@ -3,7 +3,7 @@ import { CheckCircle2, ScanLine, XCircle } from "lucide-react";
 import { ScanEventsTable } from "@/components/admin/scan-events-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
-import { getCeremonies, getScanEventsAdmin } from "@/lib/mock";
+import { getCeremonies, getScanEventsAdmin } from "@/lib/data";
 import { formatNumber } from "@/lib/format";
 
 export const metadata = {

@@ -1,6 +1,6 @@
 import { CeremoniesTable } from "@/components/admin/ceremonies-table";
 import { PageHeader } from "@/components/shared/page-header";
-import { getCeremonies } from "@/lib/mock";
+import { getCeremonies } from "@/lib/data";
 
 export const metadata = {
   title: "Ceremonias — Panel administrador",

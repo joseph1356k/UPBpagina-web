@@ -27,7 +27,7 @@ import {
   getCeremony,
   getCeremonyStats,
   getGraduates,
-} from "@/lib/mock";
+} from "@/lib/data";
 import { ROUTES } from "@/lib/constants";
 import {
   formatDateLong,

@@ -16,11 +16,11 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { QrCodeMock } from "@/components/shared/qr-code-mock";
+import { QrCode } from "@/components/shared/qr-code";
 import { GuestStatusBadge } from "@/components/shared/status-badge";
 import { PRODUCT } from "@/lib/constants";
 import { formatDateLong, formatTime } from "@/lib/format";
-import type { InvitationView as InvitationViewData } from "@/lib/mock";
+import type { InvitationView as InvitationViewData } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -152,9 +152,7 @@ export function InvitationView({ view, token }: Props) {
 
         {/* QR */}
         <div className="mt-5 flex justify-center">
-          <div className="rounded-xl border border-border bg-white p-4 shadow-inner">
-            <QrCodeMock value={token} size={220} />
-          </div>
+          <QrCode value={`${typeof window !== "undefined" ? window.location.origin : ""}/invitacion/${token}`} size={220} />
         </div>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">

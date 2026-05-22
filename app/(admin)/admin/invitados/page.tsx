@@ -1,6 +1,6 @@
 import { GuestsAdminTable } from "@/components/admin/guests-admin-table";
 import { PageHeader } from "@/components/shared/page-header";
-import { getCeremonies, getGuestsAdmin } from "@/lib/mock";
+import { getCeremonies, getGuestsAdmin } from "@/lib/data";
 
 export const metadata = {
   title: "Invitados — Panel administrador",

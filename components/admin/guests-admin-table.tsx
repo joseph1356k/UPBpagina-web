@@ -24,11 +24,11 @@ import {
 import { GuestStatusBadge } from "@/components/shared/status-badge";
 import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
-import { revokeGuestAdmin } from "@/lib/mock";
+import { revokeGuestAdmin } from "@/lib/data";
 import { GUEST_STATUS_LABEL, ROUTES } from "@/lib/constants";
 import { formatDocument, formatDateTime } from "@/lib/format";
 import type { Ceremony, GuestStatus } from "@/lib/types";
-import type { GuestAdminRow } from "@/lib/mock";
+import type { GuestAdminRow } from "@/lib/data";
 
 const PAGE_SIZE = 15;
 

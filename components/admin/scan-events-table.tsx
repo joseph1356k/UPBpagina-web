@@ -20,7 +20,7 @@ import {
 } from "@/lib/constants";
 import { formatDateTime, formatRelativeFromNow } from "@/lib/format";
 import type { Ceremony, ScanResult } from "@/lib/types";
-import type { ScanEventRow } from "@/lib/mock";
+import type { ScanEventRow } from "@/lib/data";
 
 const PAGE_SIZE = 20;
 

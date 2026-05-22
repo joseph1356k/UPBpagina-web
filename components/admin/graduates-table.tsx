@@ -26,7 +26,7 @@ import {
 } from "@/components/shared/status-badge";
 import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
-import { updateGraduateAdmin } from "@/lib/mock";
+import { updateGraduateAdmin } from "@/lib/data";
 import {
   DOCUMENT_TYPE_LABEL,
   GRADUATE_STATUS_LABEL,

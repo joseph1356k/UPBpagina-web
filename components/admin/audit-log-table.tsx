@@ -17,7 +17,7 @@ import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
 import { formatDateTime, formatRelativeFromNow } from "@/lib/format";
 import type { AuditAction, EntityType } from "@/lib/types";
-import type { AuditLogRow } from "@/lib/mock";
+import type { AuditLogRow } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;

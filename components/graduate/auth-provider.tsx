@@ -13,7 +13,7 @@ import { Loader2 } from "lucide-react";
 
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROUTES } from "@/lib/constants";
-import { getCeremony, getGraduate, getGuests } from "@/lib/mock";
+import { getCeremony, getGraduate, getGuests } from "@/lib/data";
 import {
   clearSession,
   getSession,

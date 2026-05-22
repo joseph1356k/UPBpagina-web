@@ -1,6 +1,6 @@
 import { GraduatesTable } from "@/components/admin/graduates-table";
 import { PageHeader } from "@/components/shared/page-header";
-import { getCeremonies, getGraduates } from "@/lib/mock";
+import { getCeremonies, getGraduates } from "@/lib/data";
 
 export const metadata = {
   title: "Graduandos — Panel administrador",

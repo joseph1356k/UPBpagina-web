@@ -4,6 +4,7 @@ import { Bell, Menu, Search } from "lucide-react";
 import { useState } from "react";
 
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ export function AdminTopbar({ className }: AdminTopbarProps) {
       <div className="md:hidden flex-1" />
 
       <div className="flex items-center gap-1">
+        <ThemeToggle />
         <Button
           variant="ghost"
           size="icon-sm"

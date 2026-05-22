@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { BrandMark } from "@/components/shared/brand-mark";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
 
@@ -34,7 +35,8 @@ export function PublicHeader() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5">
+          <ThemeToggle />
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
             <Link href={ROUTES.admin}>Acceder como administrador</Link>
           </Button>

@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BrandMark } from "@/components/shared/brand-mark";
-import { getGraduateByDocument } from "@/lib/mock";
+import { getGraduateByDocument } from "@/lib/data";
 import { DOCUMENT_TYPE_LABEL, ROUTES } from "@/lib/constants";
 import type { DocumentType } from "@/lib/types";
 

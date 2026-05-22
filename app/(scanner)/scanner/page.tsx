@@ -1,5 +1,5 @@
 import { ScannerUI } from "@/components/scanner/scanner-ui";
-import { getCeremonies, getUsers } from "@/lib/mock";
+import { getCeremonies, getUsers } from "@/lib/data";
 
 export const metadata = {
   title: "Escáner de ingreso",

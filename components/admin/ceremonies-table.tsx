@@ -25,7 +25,7 @@ import { CeremonyStatusBadge } from "@/components/shared/status-badge";
 import { CeremonyForm } from "./ceremony-form";
 import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
-import { updateCeremony } from "@/lib/mock";
+import { updateCeremony } from "@/lib/data";
 import {
   CEREMONY_STATUS_LABEL,
   ROUTES,

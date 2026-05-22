@@ -22,7 +22,7 @@ import {
 } from "@/lib/constants";
 import { formatDateTime, formatDateShort } from "@/lib/format";
 import type { Ceremony, Graduate } from "@/lib/types";
-import type { GuestAdminRow, ScanEventRow } from "@/lib/mock";
+import type { GuestAdminRow, ScanEventRow } from "@/lib/data";
 
 type ReportKey = "graduates" | "guests" | "scans" | "summary";
 

@@ -8,68 +8,86 @@
  *     import { getCeremonies, createCeremony } from "@/lib/data";
  *
  * Behaviour is controlled by `NEXT_PUBLIC_USE_SUPABASE`:
- *   - "true"   → all calls go to the real Supabase (`lib/db`)
+ *   - "true"   → server-side calls go to the real Supabase (`lib/db`)
  *   - anything else → in-memory mock (`lib/mock`)
  *
- * Default is mock, so the app works with zero config out of the box.
+ * ⚠ Client component behaviour:
+ *   - Mock mode  → works (in-browser arrays)
+ *   - Real mode  → DOES NOT WORK for mutations. Client components must
+ *                  call /api/* endpoints instead. Mutations from client
+ *                  components will throw a clear runtime error.
  *
- * ─── Migration path ────────────────────────────────────────────────────
- *  Today: components import from `@/lib/mock` directly.
- *  Goal:  one find-and-replace from `@/lib/mock` to `@/lib/data` and
- *         flipping the env var swaps the data layer entirely.
- *
- *  The two modules expose the *exact same* function signatures —
- *  enforced by TypeScript via `satisfies` checks below.
+ * ─── Why no static import of lib/db ────────────────────────────────────
+ *  lib/db transitively imports next/headers which is server-only.
+ *  Even a `import type` was getting traced by webpack into client bundles.
+ *  So the import is fully lazy + dynamic path string to defeat tracing.
  */
 
 import { USE_SUPABASE } from "@/lib/supabase/env";
 
 import * as mock from "@/lib/mock";
-import type * as db from "@/lib/db";
 
-// Compile-time shape check — if the two diverge, TS errors here.
-// (We use `db` only as a type reference, never imported at runtime
-// when USE_SUPABASE is false, to keep client bundles small.)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type _ShapeCheck = {
-  [K in keyof typeof mock]: K extends keyof typeof db
-    ? (typeof mock)[K] extends (typeof db)[K]
-      ? true
-      : false
-    : "missing-in-db";
-};
+// Re-export types (type-only — erased at runtime, no bundle impact)
+export type {
+  GetGraduatesArgs,
+  GetGuestsArgs,
+  GetScanEventsArgs,
+  GetGuestsAdminArgs,
+  GuestAdminRow,
+  CreateCeremonyInput,
+  UpdateCeremonyInput,
+  CreateUserInput,
+  UpdateUserInput,
+  UpdateGraduateAdminInput,
+  OverviewStats,
+  InvitationView,
+  SimulatedScanResult,
+  ScanEventRow,
+  AuditLogRow,
+} from "@/lib/mock";
 
-// Dynamic import keeps `lib/db` (which uses next/headers) out of the
-// client bundle when running in mock mode.
-let _real: typeof db | null = null;
-async function real(): Promise<typeof db> {
+/* ──────────────────────────────────────────────────────────────────
+   Lazy db loader — server only, defeats webpack tracing
+   ────────────────────────────────────────────────────────────────── */
+
+const isServer = typeof window === "undefined";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _real: any | null = null;
+
+async function loadReal() {
   if (_real) return _real;
-  _real = (await import("@/lib/db")) as typeof db;
+  if (!isServer) {
+    throw new Error(
+      "[data] Real Supabase mode is server-only. Client components " +
+        "must call /api/* endpoints instead of importing from @/lib/data.",
+    );
+  }
+  // Dynamic path string defeats webpack's static analysis so lib/db
+  // never lands in client bundles. ⚠ Keep this pattern intact.
+  const modulePath = "./db";
+  _real = await import(/* webpackIgnore: true */ modulePath);
   return _real;
 }
 
 /* ──────────────────────────────────────────────────────────────────
-   Wrap every mock function so the runtime decision happens per call.
-   This keeps the bundle small (mock only) when USE_SUPABASE=false.
+   Router factory — wraps each mock function with runtime routing
    ────────────────────────────────────────────────────────────────── */
 
 type AnyFn = (...args: never[]) => unknown;
 
 function route<K extends keyof typeof mock>(name: K): (typeof mock)[K] {
-  const mockFn = mock[name] as unknown as AnyFn;
-  if (typeof mockFn !== "function") {
-    // Non-function exports (types/interfaces) are re-exported as-is below.
-    return mock[name];
-  }
-  if (!USE_SUPABASE) return mock[name];
+  const mockFn = mock[name];
+  if (typeof mockFn !== "function") return mockFn; // non-function exports
+  if (!USE_SUPABASE) return mockFn;
 
-  return (async (...args: unknown[]) => {
-    const real_ = await real();
-    const realFn = (real_ as unknown as Record<string, AnyFn>)[name];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (async (...args: any[]) => {
+    const real = await loadReal();
+    const realFn = real[name] as AnyFn | undefined;
     if (!realFn) {
       throw new Error(
-        `[data] Function "${String(name)}" is not implemented in lib/db. ` +
-          `Either add it there or remove from lib/mock.`,
+        `[data] Function "${String(name)}" not implemented in lib/db.`,
       );
     }
     return realFn(...(args as never[]));
@@ -122,7 +140,8 @@ export const getInvitationByToken  = route("getInvitationByToken");
 export const simulateScan          = route("simulateScan");
 
 /* ──────────────────────────────────────────────────────────────────
-   Mutations
+   Mutations — note: in Supabase mode these are server-only.
+   Client components must use /api/* endpoints.
    ────────────────────────────────────────────────────────────────── */
 
 export const createCeremony        = route("createCeremony");
@@ -131,25 +150,3 @@ export const updateGraduateAdmin   = route("updateGraduateAdmin");
 export const revokeGuestAdmin      = route("revokeGuestAdmin");
 export const createUser            = route("createUser");
 export const updateUser            = route("updateUser");
-
-/* ──────────────────────────────────────────────────────────────────
-   Type re-exports (always the same shape — no routing needed)
-   ────────────────────────────────────────────────────────────────── */
-
-export type {
-  GetGraduatesArgs,
-  GetGuestsArgs,
-  GetScanEventsArgs,
-  GetGuestsAdminArgs,
-  GuestAdminRow,
-  CreateCeremonyInput,
-  UpdateCeremonyInput,
-  CreateUserInput,
-  UpdateUserInput,
-  UpdateGraduateAdminInput,
-  OverviewStats,
-  InvitationView,
-  SimulatedScanResult,
-  ScanEventRow,
-  AuditLogRow,
-} from "@/lib/mock";

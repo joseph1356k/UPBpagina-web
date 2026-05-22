@@ -23,7 +23,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import { createUser, updateUser, type CreateUserInput } from "@/lib/mock";
+import { createUser, updateUser, type CreateUserInput } from "@/lib/data";
 import { USER_ROLE_LABEL } from "@/lib/constants";
 import type { User, UserRole } from "@/lib/types";
 

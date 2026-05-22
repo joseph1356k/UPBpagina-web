@@ -1,6 +1,6 @@
 import { AuditLogTable } from "@/components/admin/audit-log-table";
 import { PageHeader } from "@/components/shared/page-header";
-import { getAuditLogAdmin } from "@/lib/mock";
+import { getAuditLogAdmin } from "@/lib/data";
 
 export const metadata = {
   title: "Auditoría — Panel administrador",

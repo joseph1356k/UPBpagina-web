@@ -1,6 +1,6 @@
 import { UsersTable } from "@/components/admin/users-table";
 import { PageHeader } from "@/components/shared/page-header";
-import { getUsers } from "@/lib/mock";
+import { getUsers } from "@/lib/data";
 
 export const metadata = {
   title: "Usuarios — Panel administrador",

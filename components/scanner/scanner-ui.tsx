@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { simulateScan, type SimulatedScanResult } from "@/lib/mock";
+import { simulateScan, type SimulatedScanResult } from "@/lib/data";
 import { ROUTES, SCAN_DENIED_REASON_LABEL } from "@/lib/constants";
 import { formatDocument, formatInitials, formatTime } from "@/lib/format";
 import type { Ceremony, ScanDeniedReason, User } from "@/lib/types";

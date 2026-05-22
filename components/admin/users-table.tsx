@@ -30,7 +30,7 @@ import {
 import { UserForm } from "./user-form";
 import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
-import { updateUser } from "@/lib/mock";
+import { updateUser } from "@/lib/data";
 import { USER_ROLE_LABEL } from "@/lib/constants";
 import { formatInitials, formatRelativeFromNow } from "@/lib/format";
 import type { User, UserRole } from "@/lib/types";

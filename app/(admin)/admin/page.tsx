@@ -31,7 +31,7 @@ import {
   getOverviewStats,
   getScanEvents,
   getUsers,
-} from "@/lib/mock";
+} from "@/lib/data";
 
 export const metadata = {
   title: "Panel administrador",

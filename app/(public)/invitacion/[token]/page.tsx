@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getInvitationByToken } from "@/lib/mock";
+import { getInvitationByToken } from "@/lib/data";
 
 import { InvitationView } from "./invitation-view";
 

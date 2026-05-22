@@ -9,7 +9,7 @@ export default function PublicLayout({
   return (
     <>
       <PublicHeader />
-      <main className="flex flex-1 flex-col">{children}</main>
+      <main id="main-content" className="flex flex-1 flex-col">{children}</main>
       <PublicFooter />
     </>
   );

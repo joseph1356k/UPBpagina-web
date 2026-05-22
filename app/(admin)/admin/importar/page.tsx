@@ -1,6 +1,6 @@
 import { ImportStepper } from "@/components/admin/import-stepper";
 import { PageHeader } from "@/components/shared/page-header";
-import { getCeremonies } from "@/lib/mock";
+import { getCeremonies } from "@/lib/data";
 
 export const metadata = {
   title: "Importar base — Panel administrador",

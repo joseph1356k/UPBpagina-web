@@ -21,7 +21,7 @@ import {
   getCeremony,
   getGraduate,
   getGuests,
-} from "@/lib/mock";
+} from "@/lib/data";
 import { DOCUMENT_TYPE_LABEL, ROUTES } from "@/lib/constants";
 import {
   formatDateShort,

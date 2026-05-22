@@ -5,7 +5,7 @@ import {
   getGraduates,
   getGuestsAdmin,
   getScanEventsAdmin,
-} from "@/lib/mock";
+} from "@/lib/data";
 
 export const metadata = {
   title: "Reportes — Panel administrador",

@@ -26,7 +26,7 @@ import {
   createCeremony,
   updateCeremony,
   type CreateCeremonyInput,
-} from "@/lib/mock";
+} from "@/lib/data";
 import type { Ceremony, CeremonyStatus } from "@/lib/types";
 
 /* ------------------------------------------------------------------ */

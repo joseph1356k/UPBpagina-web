@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getCeremony, getGraduate } from "@/lib/mock";
+import { getCeremony, getGraduate } from "@/lib/data";
 import { OtpVerificationForm } from "./otp-form";
 
 export const metadata = {

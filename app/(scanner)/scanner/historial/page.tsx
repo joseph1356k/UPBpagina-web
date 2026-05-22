@@ -4,7 +4,7 @@ import { ArrowLeft, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScanResultBadge } from "@/components/shared/status-badge";
 import { Separator } from "@/components/ui/separator";
-import { getScanEventsAdmin, getUsers } from "@/lib/mock";
+import { getScanEventsAdmin, getUsers } from "@/lib/data";
 import { ROUTES, SCAN_DENIED_REASON_LABEL } from "@/lib/constants";
 import { formatDateTime, formatRelativeFromNow } from "@/lib/format";
 
