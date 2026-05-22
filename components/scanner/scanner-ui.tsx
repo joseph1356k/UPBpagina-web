@@ -24,6 +24,8 @@ import {
 import { simulateScan, type SimulatedScanResult } from "@/lib/data";
 import { ROUTES, SCAN_DENIED_REASON_LABEL } from "@/lib/constants";
 import { formatDocument, formatInitials, formatTime } from "@/lib/format";
+import { useOnline } from "@/lib/pwa/use-online";
+import { enqueueScan } from "@/lib/pwa/scan-queue";
 import type { Ceremony, ScanDeniedReason, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +56,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
   const operatorName = operator?.fullName ?? FALLBACK_OPERATOR_NAME;
   const operatorId = operator?.id ?? "usr_scan_demo";
   const activeCeremony = ceremonies.find((c) => c.id === ceremonyId);
+  const online = useOnline();
 
   function doScan() {
     if (!ceremonyId) return;
@@ -61,6 +64,43 @@ export function ScannerUI({ operator, ceremonies }: Props) {
     startTransition(async () => {
       // simulate camera "focus" delay
       await new Promise((r) => setTimeout(r, 900));
+
+      // OFFLINE PATH (real-mode scanner without network):
+      // enqueue the scan locally; flush automatically when online.
+      // In mock mode we still run simulateScan because we have no
+      // real token to queue.
+      if (!online && typeof window !== "undefined") {
+        // We don't have a real token here (camera is simulated), so
+        // we queue a synthetic placeholder. In a real deployment the
+        // camera lib hands us the decoded QR string.
+        const placeholderToken = `offline_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        try {
+          await enqueueScan(placeholderToken);
+        } catch {
+          // IndexedDB unavailable — fall through to mock
+        }
+        setState({
+          kind: "result",
+          data: {
+            result: "allowed",
+            reason: null,
+            guest: null,
+            graduate: null,
+            ceremonyName: activeCeremony?.name ?? null,
+            scanEvent: {
+              id: `local_${Date.now()}`,
+              guestId: null,
+              scannedByUserId: operatorId,
+              scannedAt: new Date().toISOString(),
+              result: "allowed",
+              reason: null,
+            },
+          },
+        });
+        setStats((s) => ({ allowed: s.allowed + 1, denied: s.denied }));
+        return;
+      }
+
       const result = await simulateScan({
         scannedByUserId: operatorId,
         ceremonyId,

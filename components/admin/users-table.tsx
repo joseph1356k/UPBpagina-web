@@ -30,7 +30,7 @@ import {
 import { UserForm } from "./user-form";
 import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
-import { updateUser } from "@/lib/data";
+import { adminApi } from "@/lib/api-client";
 import { USER_ROLE_LABEL } from "@/lib/constants";
 import { formatInitials, formatRelativeFromNow } from "@/lib/format";
 import type { User, UserRole } from "@/lib/types";
@@ -97,7 +97,7 @@ export function UsersTable({ initialUsers }: Props) {
 
   async function handleToggleActive(u: User) {
     try {
-      const updated = await updateUser(u.id, { active: !u.active });
+      const updated = await adminApi.users.update(u.id, { active: !u.active });
       setUsers((prev) =>
         prev.map((x) => (x.id === updated.id ? updated : x)),
       );

@@ -53,6 +53,67 @@ export const SendInvitationsBody = z.object({
 export type SendInvitationsInput = z.infer<typeof SendInvitationsBody>;
 
 /* ────────────────────────────────────────────────────────────────────
+   Admin mutations — ceremonies
+   ──────────────────────────────────────────────────────────────────── */
+
+const CeremonyBase = {
+  name: z.string().trim().min(3).max(120),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "fecha YYYY-MM-DD"),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "hora HH:MM"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "hora HH:MM"),
+  venue: z.string().trim().min(2).max(150),
+  campus: z.string().trim().min(2).max(100),
+  faculty: z.string().trim().min(2).max(150),
+  status: z.enum(["draft", "open", "closed", "in_progress", "completed"]),
+  maxGuestsDefault: z.number().int().min(1).max(20),
+  registrationClosesAt: z.string().min(10).max(40),
+};
+
+export const CreateCeremonyBody = z.object(CeremonyBase);
+export const UpdateCeremonyBody = z.object(CeremonyBase).partial();
+export type CreateCeremonyBodyT = z.infer<typeof CreateCeremonyBody>;
+export type UpdateCeremonyBodyT = z.infer<typeof UpdateCeremonyBody>;
+
+/* ────────────────────────────────────────────────────────────────────
+   Admin mutations — users
+   ──────────────────────────────────────────────────────────────────── */
+
+export const CreateUserBody = z.object({
+  fullName: z.string().trim().min(2).max(80),
+  email: z.string().trim().toLowerCase().email().max(120),
+  role: z.enum(["admin", "scanner", "coordinator"]),
+  active: z.boolean(),
+});
+
+export const UpdateUserBody = z.object({
+  fullName: z.string().trim().min(2).max(80).optional(),
+  email: z.string().trim().toLowerCase().email().max(120).optional(),
+  role: z.enum(["admin", "scanner", "coordinator"]).optional(),
+  active: z.boolean().optional(),
+});
+export type CreateUserBodyT = z.infer<typeof CreateUserBody>;
+export type UpdateUserBodyT = z.infer<typeof UpdateUserBody>;
+
+/* ────────────────────────────────────────────────────────────────────
+   Admin mutations — graduates
+   ──────────────────────────────────────────────────────────────────── */
+
+export const UpdateGraduateBody = z.object({
+  documentType: z.enum(["CC", "CE", "TI", "PP"]).optional(),
+  documentNumber: z.string().trim().min(6).max(15).optional(),
+  studentCode: z.string().trim().min(3).max(20).optional(),
+  fullName: z.string().trim().min(2).max(120).optional(),
+  email: z.string().trim().toLowerCase().email().max(120).optional(),
+  program: z.string().trim().min(2).max(150).optional(),
+  faculty: z.string().trim().min(2).max(150).optional(),
+  maxGuests: z.number().int().min(0).max(20).optional(),
+  status: z
+    .enum(["eligible", "not_eligible", "registered", "completed"])
+    .optional(),
+});
+export type UpdateGraduateBodyT = z.infer<typeof UpdateGraduateBody>;
+
+/* ────────────────────────────────────────────────────────────────────
    Helper — parse + collapse errors
    ──────────────────────────────────────────────────────────────────── */
 

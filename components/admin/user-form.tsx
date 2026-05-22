@@ -23,7 +23,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
-import { createUser, updateUser, type CreateUserInput } from "@/lib/data";
+import { adminApi } from "@/lib/api-client";
+import type { CreateUserInput } from "@/lib/data";
 import { USER_ROLE_LABEL } from "@/lib/constants";
 import type { User, UserRole } from "@/lib/types";
 
@@ -135,10 +136,10 @@ function UserFormContents({ user, onClose, onSave }: InnerProps) {
 
         let saved: User;
         if (isEdit && user) {
-          saved = await updateUser(user.id, input);
+          saved = await adminApi.users.update(user.id, input);
           toast.success("Usuario actualizado");
         } else {
-          saved = await createUser(input);
+          saved = await adminApi.users.create(input);
           toast.success("Usuario creado");
         }
         onSave(saved);

@@ -26,7 +26,7 @@ import {
 } from "@/components/shared/status-badge";
 import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
-import { updateGraduateAdmin } from "@/lib/data";
+import { adminApi } from "@/lib/api-client";
 import {
   DOCUMENT_TYPE_LABEL,
   GRADUATE_STATUS_LABEL,
@@ -96,7 +96,7 @@ export function GraduatesTable({
 
   async function handleStatusChange(g: Graduate, status: GraduateStatus) {
     try {
-      const updated = await updateGraduateAdmin(g.id, { status });
+      const updated = await adminApi.graduates.update(g.id, { status });
       setGraduates((prev) =>
         prev.map((x) => (x.id === updated.id ? updated : x)),
       );

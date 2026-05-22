@@ -22,11 +22,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  createCeremony,
-  updateCeremony,
-  type CreateCeremonyInput,
-} from "@/lib/data";
+import { adminApi } from "@/lib/api-client";
+import type { CreateCeremonyInput } from "@/lib/data";
 import type { Ceremony, CeremonyStatus } from "@/lib/types";
 
 /* ------------------------------------------------------------------ */
@@ -187,10 +184,10 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
 
         let saved: Ceremony;
         if (isEdit && ceremony) {
-          saved = await updateCeremony(ceremony.id, input);
+          saved = await adminApi.ceremonies.update(ceremony.id, input);
           toast.success("Ceremonia actualizada");
         } else {
-          saved = await createCeremony(input);
+          saved = await adminApi.ceremonies.create(input);
           toast.success("Ceremonia creada");
         }
         onSave(saved);

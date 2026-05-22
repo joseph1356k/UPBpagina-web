@@ -25,7 +25,7 @@ import { CeremonyStatusBadge } from "@/components/shared/status-badge";
 import { CeremonyForm } from "./ceremony-form";
 import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
-import { updateCeremony } from "@/lib/data";
+import { adminApi } from "@/lib/api-client";
 import {
   CEREMONY_STATUS_LABEL,
   ROUTES,
@@ -99,7 +99,7 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
 
   async function handleArchive(c: Ceremony) {
     try {
-      const updated = await updateCeremony(c.id, { status: "completed" });
+      const updated = await adminApi.ceremonies.update(c.id, { status: "completed" });
       setCeremonies((prev) =>
         prev.map((x) => (x.id === updated.id ? updated : x)),
       );

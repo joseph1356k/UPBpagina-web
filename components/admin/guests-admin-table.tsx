@@ -24,7 +24,7 @@ import {
 import { GuestStatusBadge } from "@/components/shared/status-badge";
 import { TablePagination } from "./table-pagination";
 import { TableToolbar } from "./table-toolbar";
-import { revokeGuestAdmin } from "@/lib/data";
+import { adminApi } from "@/lib/api-client";
 import { GUEST_STATUS_LABEL, ROUTES } from "@/lib/constants";
 import { formatDocument, formatDateTime } from "@/lib/format";
 import type { Ceremony, GuestStatus } from "@/lib/types";
@@ -84,7 +84,7 @@ export function GuestsAdminTable({
 
   async function handleRevoke(id: string) {
     try {
-      const updated = await revokeGuestAdmin(id);
+      const updated = await adminApi.guests.revoke(id);
       setGuests((prev) =>
         prev.map((g) => (g.id === updated.id ? { ...g, status: "revoked" as const } : g)),
       );
