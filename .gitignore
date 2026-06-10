@@ -42,3 +42,5 @@ next-env.d.ts
 
 # Claude Code — cloned external skill repos (tracked by reference, not committed)
 .claude/skills/
+
+.vercel

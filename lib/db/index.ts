@@ -655,8 +655,14 @@ interface RawInvitationRpc {
 export async function getInvitationByToken(
   token: string,
 ): Promise<InvitationView | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_invitation_by_token", {
+  // The RPC is anon-callable (SECURITY DEFINER + GRANT EXECUTE TO anon).
+  // Use the service client for the follow-up SELECTs so we bypass RLS —
+  // the invitee is unauthenticated, and guests/graduates RLS only lets
+  // staff read. The data we return is the same data the invitee already
+  // received by email, so this isn't an information leak.
+  const service = createServiceClient();
+
+  const { data, error } = await service.rpc("get_invitation_by_token", {
     p_token: token,
   });
   if (error) throw error;
@@ -664,23 +670,26 @@ export async function getInvitationByToken(
   const rpc = data as unknown as RawInvitationRpc | null;
   if (!rpc) return null;
 
-  // Get the full rows by id so callers see the same shape as the mock
-  const [guest, graduate, ceremony] = await Promise.all([
-    getGuest(rpc.guest.id),
-    (async () => {
-      // Need graduate row; we know graduate exists since invitation joined it
-      const { data: g, error: e } = await supabase
-        .from("graduates")
-        .select("*")
-        .eq("full_name", rpc.graduate.fullName)
-        .limit(1)
-        .maybeSingle();
-      if (e) throw e;
-      return g ? graduateFromRow(g) : null;
-    })(),
-    getCeremony(rpc.ceremony.id),
+  // Fetch the full rows by id (service role → no RLS).
+  const [guestRes, gradRes, cerRes] = await Promise.all([
+    service.from("guests").select("*").eq("id", rpc.guest.id).maybeSingle(),
+    service
+      .from("graduates")
+      .select("*")
+      .eq("ceremony_id", rpc.ceremony.id)
+      .eq("full_name", rpc.graduate.fullName)
+      .limit(1)
+      .maybeSingle(),
+    service.from("ceremonies").select("*").eq("id", rpc.ceremony.id).maybeSingle(),
   ]);
-  if (!guest || !graduate || !ceremony) return null;
+  if (guestRes.error || gradRes.error || cerRes.error) {
+    return null;
+  }
+  if (!guestRes.data || !gradRes.data || !cerRes.data) return null;
+
+  const guest = guestFromRow(guestRes.data);
+  const graduate = graduateFromRow(gradRes.data);
+  const ceremony = ceremonyFromRow(cerRes.data);
 
   let blocked: InvitationView["blocked"];
   if (guest.status === "revoked") blocked = "revoked";
