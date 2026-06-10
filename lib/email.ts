@@ -159,6 +159,112 @@ export function invitationEmailTemplate(args: {
   return { subject, html, text };
 }
 
+export function invitationsSentConfirmationTemplate(args: {
+  graduateName: string;
+  ceremonyName: string;
+  guests: Array<{ name: string; email: string | null }>;
+}): { subject: string; html: string; text: string } {
+  const first = args.graduateName.split(" ")[0];
+  const subject = `Confirmación: ${args.guests.length} invitación${args.guests.length !== 1 ? "es" : ""} enviada${args.guests.length !== 1 ? "s" : ""} · UPB Ceremonias`;
+  const listText = args.guests
+    .map((g) => `  · ${g.name}${g.email ? ` (${g.email})` : " — sin correo, entrégale el pase manualmente"}`)
+    .join("\n");
+  const text =
+    `Hola ${first},\n\n` +
+    `Confirmamos el envío de las invitaciones para tu ceremonia ` +
+    `"${args.ceremonyName}":\n\n${listText}\n\n` +
+    `Cada invitado recibió un correo con su pase QR personal. ` +
+    `Recuérdales revisar la carpeta de spam si no lo ven.\n\n` +
+    `— Universidad Pontificia Bolivariana`;
+  const listHtml = args.guests
+    .map(
+      (g) => `
+      <li style="padding:6px 0;border-bottom:1px solid #f0ece4;">
+        <strong style="color:#1a1a1a;">${escapeHtml(g.name)}</strong>
+        ${
+          g.email
+            ? `<span style="color:#777;font-size:13px;"> · ${escapeHtml(g.email)}</span>`
+            : `<span style="color:#A6192E;font-size:13px;"> · sin correo — comparte su pase manualmente</span>`
+        }
+      </li>`,
+    )
+    .join("");
+  const html = baseEmailFrame(`
+    <h1 style="font-family:Georgia,serif;font-size:22px;color:#1a1a1a;margin:0 0 8px;">
+      Invitaciones enviadas ✓
+    </h1>
+    <p style="margin:0 0 16px;color:#555;font-size:15px;line-height:1.55;">
+      Hola ${escapeHtml(first)}, confirmamos el envío de los pases para
+      <strong style="color:#1a1a1a;">${escapeHtml(args.ceremonyName)}</strong>:
+    </p>
+    <ul style="list-style:none;margin:0 0 20px;padding:0;font-size:14px;">
+      ${listHtml}
+    </ul>
+    <p style="margin:0;color:#999;font-size:12px;line-height:1.55;">
+      Cada invitado recibió un correo con su código QR personal. Si alguno no
+      lo encuentra, pídele revisar la carpeta de spam — o entra a tu portal
+      para reenviar la invitación.
+    </p>
+  `);
+  return { subject, html, text };
+}
+
+export function welcomeGraduateEmailTemplate(args: {
+  graduateName: string;
+  ceremonyName: string;
+  ceremonyDate: string;
+  ceremonyTime: string;
+  ceremonyVenue: string;
+  maxGuests: number;
+  registrationClosesAt: string;
+  portalUrl: string;
+}): { subject: string; html: string; text: string } {
+  const first = args.graduateName.split(" ")[0];
+  const subject = `Registra a tus invitados · Ceremonia de grado UPB`;
+  const text =
+    `Hola ${first},\n\n` +
+    `¡Felicitaciones por tu grado! Ya puedes registrar a tus invitados ` +
+    `para la ceremonia.\n\n` +
+    `Ceremonia: ${args.ceremonyName}\n` +
+    `Fecha: ${args.ceremonyDate} a las ${args.ceremonyTime}\n` +
+    `Lugar: ${args.ceremonyVenue}\n` +
+    `Cupo: hasta ${args.maxGuests} invitados\n` +
+    `Fecha límite de registro: ${args.registrationClosesAt}\n\n` +
+    `Ingresa con tu número de documento aquí:\n${args.portalUrl}\n\n` +
+    `Cada invitado recibirá un código QR personal por correo — ese es su ` +
+    `pase de ingreso el día de la ceremonia.\n\n` +
+    `— Universidad Pontificia Bolivariana`;
+  const html = baseEmailFrame(`
+    <h1 style="font-family:Georgia,serif;font-size:22px;color:#1a1a1a;margin:0 0 8px;">
+      ¡Felicitaciones, ${escapeHtml(first)}! 🎓
+    </h1>
+    <p style="margin:0 0 16px;color:#555;font-size:15px;line-height:1.55;">
+      Tu ceremonia de grado está programada y ya puedes registrar a las
+      personas que te acompañarán.
+    </p>
+    <div style="background:#faf7f2;border:1px solid #eee;padding:18px 22px;border-radius:10px;
+                margin:24px 0;font-size:14px;color:#333;line-height:1.6;">
+      <p style="margin:0 0 6px;font-weight:bold;color:#1a1a1a;">${escapeHtml(args.ceremonyName)}</p>
+      <p style="margin:0;color:#555;">📅 ${escapeHtml(args.ceremonyDate)} · ${escapeHtml(args.ceremonyTime)}</p>
+      <p style="margin:0;color:#555;">📍 ${escapeHtml(args.ceremonyVenue)}</p>
+      <p style="margin:8px 0 0;color:#555;">👥 Cupo: hasta <strong>${args.maxGuests} invitados</strong></p>
+      <p style="margin:0;color:#A6192E;font-size:13px;">⏰ Registra antes del ${escapeHtml(args.registrationClosesAt)}</p>
+    </div>
+    <p style="text-align:center;margin:0 0 24px;">
+      <a href="${args.portalUrl}"
+         style="display:inline-block;background:#A6192E;color:#fff;text-decoration:none;
+                padding:14px 28px;border-radius:8px;font-weight:600;font-size:15px;">
+        Registrar mis invitados
+      </a>
+    </p>
+    <p style="margin:0;color:#999;font-size:12px;line-height:1.55;">
+      Ingresarás con tu número de documento — te enviaremos un código de
+      verificación a este correo. Cada invitado recibirá su pase QR personal.
+    </p>
+  `);
+  return { subject, html, text };
+}
+
 function baseEmailFrame(body: string): string {
   return `<!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>

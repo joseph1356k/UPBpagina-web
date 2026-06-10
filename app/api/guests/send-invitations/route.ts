@@ -17,7 +17,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { USE_SUPABASE } from "@/lib/supabase/env";
-import { invitationEmailTemplate, sendEmail } from "@/lib/email";
+import {
+  invitationEmailTemplate,
+  invitationsSentConfirmationTemplate,
+  sendEmail,
+} from "@/lib/email";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { parseJson, SendInvitationsBody } from "@/lib/security/schemas";
@@ -149,6 +153,25 @@ export async function POST(request: NextRequest) {
     .update({ status: "invited", invited_at: nowIso })
     .eq("graduate_id", graduateId)
     .eq("status", "pending");
+
+  // Confirmation summary to the graduate — best effort, never blocks
+  const { data: gradContact } = await service
+    .from("graduates")
+    .select("email, full_name")
+    .eq("id", graduateId)
+    .maybeSingle();
+  if (gradContact?.email) {
+    try {
+      const confirmTpl = invitationsSentConfirmationTemplate({
+        graduateName: gradContact.full_name,
+        ceremonyName: cer.name,
+        guests: pending.map((g) => ({ name: g.full_name, email: g.email })),
+      });
+      await sendEmail({ to: gradContact.email, ...confirmTpl });
+    } catch (err) {
+      console.error("[send-invitations] confirmation email failed:", err);
+    }
+  }
 
   return NextResponse.json({ ok: true, sent, skipped });
 }

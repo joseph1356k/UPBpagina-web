@@ -135,6 +135,7 @@ export interface Database {
           faculty: string;
           max_guests: number;
           status: GraduateStatusDb;
+          notified_at: Timestamp | null;
           created_at: Timestamp;
           updated_at: Timestamp;
         };
@@ -150,6 +151,7 @@ export interface Database {
           faculty: string;
           max_guests?: number;
           status?: GraduateStatusDb;
+          notified_at?: Timestamp | null;
           created_at?: Timestamp;
           updated_at?: Timestamp;
         };
@@ -163,6 +165,7 @@ export interface Database {
           faculty?: string;
           max_guests?: number;
           status?: GraduateStatusDb;
+          notified_at?: Timestamp | null;
           updated_at?: Timestamp;
         };
         Relationships: [

@@ -11,8 +11,9 @@ export default async function GraduandosPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { ceremony } = await searchParams;
+  const { ceremony, q } = await searchParams;
   const ceremonyId = typeof ceremony === "string" ? ceremony : undefined;
+  const initialSearch = typeof q === "string" ? q : "";
 
   const [graduates, ceremonies] = await Promise.all([
     getGraduates(ceremonyId ? { ceremonyId } : {}),
@@ -31,6 +32,7 @@ export default async function GraduandosPage({
         initialGraduates={graduates}
         ceremonies={ceremonies}
         initialCeremonyId={ceremonyId ?? ""}
+        initialSearch={initialSearch}
       />
     </div>
   );

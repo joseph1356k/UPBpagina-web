@@ -48,7 +48,7 @@ export function StatCard({
   return (
     <Card
       className={cn(
-        "relative gap-3 py-5 px-5 ring-foreground/8 transition-shadow hover:ring-foreground/12",
+        "card-lift relative gap-3 py-5 px-5 ring-foreground/8",
         className,
       )}
     >

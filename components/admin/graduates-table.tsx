@@ -1,11 +1,25 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
-import { ArrowUpRight, GraduationCap, MoreHorizontal } from "lucide-react";
+import {
+  ArrowUpRight,
+  GraduationCap,
+  Loader2,
+  Mail,
+  MoreHorizontal,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,23 +62,75 @@ interface Props {
   initialGraduates: Graduate[];
   ceremonies: Ceremony[];
   initialCeremonyId?: string;
+  initialSearch?: string;
 }
 
 export function GraduatesTable({
   initialGraduates,
   ceremonies,
   initialCeremonyId = "",
+  initialSearch = "",
 }: Props) {
   const [graduates, setGraduates] = useState(initialGraduates);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState("");
   const [ceremonyFilter, setCeremonyFilter] = useState(initialCeremonyId);
   const [page, setPage] = useState(1);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [isNotifying, startNotify] = useTransition();
 
   const ceremonyMap = useMemo(
     () => new Map(ceremonies.map((c) => [c.id, c.name])),
     [ceremonies],
   );
+
+  const notifyCeremony = ceremonies.find((c) => c.id === ceremonyFilter);
+  const notifyCount = useMemo(
+    () =>
+      graduates.filter(
+        (g) =>
+          g.ceremonyId === ceremonyFilter &&
+          g.status !== "not_eligible" &&
+          g.email,
+      ).length,
+    [graduates, ceremonyFilter],
+  );
+
+  function handleNotify() {
+    if (!ceremonyFilter) return;
+    startNotify(async () => {
+      try {
+        const res = await fetch("/api/admin/graduates/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ ceremonyId: ceremonyFilter }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          sent?: number;
+          failed?: number;
+        };
+        if (!res.ok || json.ok !== true) {
+          throw new Error("notify_failed");
+        }
+        setNotifyOpen(false);
+        if ((json.sent ?? 0) === 0) {
+          toast.info(
+            "Todos los graduandos de esta ceremonia ya habían sido notificados.",
+          );
+        } else {
+          toast.success(
+            `${json.sent} graduandos notificados${
+              json.failed ? ` · ${json.failed} sin correo válido` : ""
+            }`,
+          );
+        }
+      } catch {
+        toast.error("No se pudieron enviar las notificaciones.");
+      }
+    });
+  }
 
   const filtered = useMemo(() => {
     let result = graduates;
@@ -134,6 +200,72 @@ export function GraduatesTable({
         totalCount={graduates.length}
         entityLabel="graduandos"
       />
+
+      {/* Bulk notify — appears when a specific ceremony is selected */}
+      {ceremonyFilter && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+          <div className="flex items-center gap-2.5 text-sm">
+            <Mail className="size-4 shrink-0 text-primary" />
+            <span className="text-foreground">
+              Avisa a los graduandos de{" "}
+              <strong>{notifyCeremony?.name}</strong> que ya pueden registrar
+              invitados.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setNotifyOpen(true)}
+            disabled={notifyCount === 0}
+          >
+            <Mail className="size-3.5" />
+            Notificar graduandos
+          </Button>
+        </div>
+      )}
+
+      {/* Confirm dialog */}
+      <Dialog open={notifyOpen} onOpenChange={setNotifyOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enviar correo de bienvenida</DialogTitle>
+            <DialogDescription>
+              Se enviará un correo a los graduandos de{" "}
+              <strong className="text-foreground">{notifyCeremony?.name}</strong>{" "}
+              invitándolos a registrar a sus acompañantes. Solo se notifica a
+              quienes no han recibido el aviso antes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
+            <p className="text-muted-foreground">
+              Destinatarios potenciales:{" "}
+              <strong className="text-foreground">{notifyCount}</strong>{" "}
+              graduandos con correo válido.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setNotifyOpen(false)}
+              disabled={isNotifying}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleNotify} disabled={isNotifying}>
+              {isNotifying ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Enviando…
+                </>
+              ) : (
+                <>
+                  <Mail className="size-4" />
+                  Confirmar envío
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <Table>

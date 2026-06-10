@@ -52,50 +52,50 @@ function Hero() {
       <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pt-20 pb-20 md:px-8 md:pt-28 md:pb-24 lg:grid-cols-[1.5fr_1fr]">
         {/* Copy */}
         <div>
-          <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-1 text-[0.7rem] font-medium uppercase tracking-[0.2em] text-primary backdrop-blur">
-            <Sparkles className="size-3.5" />
+          <p className="animate-in-up mb-6 inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-background/70 px-3 py-1 text-[0.7rem] font-medium uppercase tracking-[0.2em] text-primary backdrop-blur">
+            <Sparkles className="size-3.5 text-brand-gold" />
             Universidad Pontificia Bolivariana · Plataforma de grados
           </p>
-          <h1 className="max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.05] tracking-tight md:text-[3.4rem] lg:text-[3.6rem]">
+          <h1 className="animate-in-up stagger-1 max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.05] tracking-tight md:text-[3.4rem] lg:text-[3.6rem]">
             Registro de invitados a ceremonias de grado,{" "}
-            <span className="relative">
+            <span className="relative whitespace-nowrap">
               <span className="relative z-10 text-primary">sin filas</span>
               <span
                 aria-hidden
-                className="absolute inset-x-0 bottom-1 h-2 bg-brand-gold/40 -z-0"
+                className="gold-shimmer absolute inset-x-0 bottom-1 h-2 -z-0 rounded-sm opacity-50"
               />
             </span>{" "}
             y con trazabilidad.
           </h1>
-          <p className="mt-7 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
+          <p className="animate-in-up stagger-2 mt-7 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
             Una plataforma institucional para que los graduandos registren a sus
             invitados desde cualquier lugar, reciban invitaciones digitales con
             QR único, y el día del evento UPB valide cada ingreso en segundos.
           </p>
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <Button asChild size="lg">
+          <div className="animate-in-up stagger-3 mt-9 flex flex-col gap-3 sm:flex-row">
+            <Button asChild size="lg" className="group">
               <Link href={ROUTES.registro}>
                 Registrar mis invitados
-                <ArrowRight className="size-4" />
+                <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline">
               <Link href="#como-funciona">Ver cómo funciona</Link>
             </Button>
           </div>
-          <p className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
+          <p className="animate-in-up stagger-4 mt-6 flex items-center gap-2 text-xs text-muted-foreground">
             <ShieldCheck className="size-3.5" />
             Tus datos se tratan según la Ley 1581 de 2012 de protección de datos.
           </p>
         </div>
 
         {/* UPB shield emblem */}
-        <div className="relative hidden lg:flex lg:justify-center">
+        <div className="animate-in-up stagger-2 relative hidden lg:flex lg:justify-center">
           <div
             aria-hidden
             className="absolute inset-0 m-auto size-72 rounded-full bg-brand-gold/15 blur-3xl"
           />
-          <div className="relative flex flex-col items-center gap-4 rounded-3xl border border-border/70 bg-card/80 px-10 py-10 shadow-sm backdrop-blur">
+          <div className="card-lift relative flex flex-col items-center gap-4 rounded-3xl border border-border/70 bg-card/80 px-10 py-10 shadow-sm backdrop-blur">
             <UpbShield className="size-44 drop-shadow-sm" />
             <div className="text-center">
               <p className="font-serif text-base font-semibold leading-tight text-foreground">
@@ -195,7 +195,7 @@ function HowItWorks() {
         <ol className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, i) => (
             <li key={step.title}>
-              <Card className="h-full ring-foreground/8 transition-shadow hover:ring-foreground/15">
+              <Card className="card-lift h-full ring-foreground/8">
                 <div className="flex flex-col gap-4 px-5 py-6">
                   <div className="flex items-center justify-between">
                     <span
@@ -237,7 +237,7 @@ function ForAdmins() {
   const features = [
     "Importación desde Excel con preview y validación",
     "Control de cupos por graduando y por ceremonia",
-    "Plantillas de correo institucional con QR firmado",
+    "Notificación masiva a graduandos con un clic",
     "Reportes exportables a CSV con filtros granulares",
     "Auditoría inmutable de cada cambio y cada escaneo",
     "Roles separados: administrador y personal de escaneo",
@@ -341,9 +341,9 @@ function Security() {
   const points = [
     {
       icon: ShieldCheck,
-      title: "QR firmado criptográficamente",
+      title: "QR único e impredecible",
       description:
-        "Cada código es generado y firmado en el servidor con HMAC-SHA256. No se puede falsificar ni regenerar fuera de la plataforma.",
+        "Cada pase se genera en el servidor con 256 bits de aleatoriedad criptográfica. Imposible de adivinar o falsificar fuera de la plataforma.",
     },
     {
       icon: FileCheck2,
@@ -374,7 +374,7 @@ function Security() {
         </p>
         <div className="mt-12 grid gap-4 text-left md:grid-cols-3">
           {points.map((p) => (
-            <Card key={p.title} className="ring-foreground/8">
+            <Card key={p.title} className="card-lift ring-foreground/8">
               <div className="flex flex-col gap-3 px-5 py-6">
                 <span
                   aria-hidden

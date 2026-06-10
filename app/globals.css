@@ -237,6 +237,7 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    scrollbar-gutter: stable;
   }
   body {
     @apply bg-background text-foreground;
@@ -251,6 +252,49 @@
   ::selection {
     background-color: color-mix(in oklch, var(--primary) 22%, transparent);
     color: var(--foreground);
+  }
+
+  /* Slim, theme-aware scrollbars — the stock chrome bar screams "unstyled" */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground) 28%, transparent);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--muted-foreground) 45%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* Buttons get a satisfying press — tiny but changes how the app feels */
+  button:active:not(:disabled),
+  [role="button"]:active:not([aria-disabled="true"]) {
+    transform: translateY(0.5px) scale(0.99);
+  }
+  button,
+  [role="button"] {
+    transition-property: transform, background-color, border-color, color,
+      box-shadow, opacity;
+    transition-duration: 120ms;
+  }
+
+  /* Reduce motion — respect the OS setting across all our animations */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -289,5 +333,59 @@
         transparent 70%
       ),
       var(--background);
+  }
+
+  /* ── Entry animations — used with .animate-in-up + .stagger-N ── */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-in-up {
+    animation: fade-up 0.55s cubic-bezier(0.21, 0.7, 0.35, 1) both;
+  }
+  .stagger-1 { animation-delay: 60ms; }
+  .stagger-2 { animation-delay: 130ms; }
+  .stagger-3 { animation-delay: 200ms; }
+  .stagger-4 { animation-delay: 280ms; }
+  .stagger-5 { animation-delay: 360ms; }
+
+  /* ── Card lift on hover — subtle elevation change ── */
+  .card-lift {
+    transition:
+      transform 180ms cubic-bezier(0.21, 0.7, 0.35, 1),
+      box-shadow 180ms cubic-bezier(0.21, 0.7, 0.35, 1);
+  }
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 4px 16px -4px color-mix(in oklch, var(--foreground) 12%, transparent),
+      0 1px 3px color-mix(in oklch, var(--foreground) 6%, transparent);
+  }
+
+  /* ── Gold shimmer for the hero highlight underline ── */
+  @keyframes shimmer-x {
+    from { background-position: -200% center; }
+    to { background-position: 200% center; }
+  }
+  .gold-shimmer {
+    background: linear-gradient(
+      105deg,
+      var(--brand-gold) 30%,
+      color-mix(in oklch, var(--brand-gold) 40%, white) 50%,
+      var(--brand-gold) 70%
+    );
+    background-size: 200% 100%;
+    animation: shimmer-x 3.5s linear infinite;
+  }
+
+  /* ── Numeric displays — keep digits from jumping while counting ── */
+  .nums {
+    font-variant-numeric: tabular-nums;
   }
 }

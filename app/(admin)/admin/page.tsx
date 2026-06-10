@@ -89,7 +89,6 @@ export default async function AdminDashboardPage() {
           hint={`${Math.round((stats.graduatesRegistered / Math.max(stats.totalGraduates, 1)) * 100)}% de la base`}
           icon={Users}
           accent="primary"
-          trend={{ label: "+9 esta semana", direction: "up" }}
         />
         <StatCard
           label="Invitaciones con QR"
@@ -97,7 +96,6 @@ export default async function AdminDashboardPage() {
           hint="Enviadas y vigentes"
           icon={QrCode}
           accent="primary"
-          trend={{ label: "+12 hoy", direction: "up" }}
         />
         <StatCard
           label="Ingresos validados"

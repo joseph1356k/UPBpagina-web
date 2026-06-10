@@ -1,6 +1,7 @@
 "use client";
 
-import { Bell, Menu, Search } from "lucide-react";
+import { Menu, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import {
@@ -18,7 +19,17 @@ interface AdminTopbarProps {
 }
 
 export function AdminTopbar({ className, user }: AdminTopbarProps) {
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    router.push(`/admin/graduandos?q=${encodeURIComponent(q)}`);
+    setQuery("");
+  }
 
   return (
     <header
@@ -46,32 +57,29 @@ export function AdminTopbar({ className, user }: AdminTopbarProps) {
         </SheetContent>
       </Sheet>
 
-      <div className="relative hidden flex-1 max-w-md md:block">
+      <form
+        onSubmit={handleSearch}
+        className="relative hidden flex-1 max-w-md md:block"
+        role="search"
+      >
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="search"
-          placeholder="Buscar graduandos, invitados, documentos…"
-          disabled
-          className="h-9 w-full rounded-lg border border-border bg-muted/40 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar graduandos por nombre, documento o correo…"
+          aria-label="Buscar graduandos"
+          className="h-9 w-full rounded-lg border border-border bg-muted/40 pl-9 pr-12 text-sm text-foreground transition-colors placeholder:text-muted-foreground hover:bg-muted/60 focus-visible:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         />
-      </div>
+        <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[0.62rem] font-medium text-muted-foreground lg:inline-block">
+          Enter
+        </kbd>
+      </form>
 
       <div className="md:hidden flex-1" />
 
       <div className="flex items-center gap-1">
         <ThemeToggle />
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Notificaciones"
-          className="relative"
-        >
-          <Bell className="size-4" />
-          <span
-            aria-hidden
-            className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary ring-2 ring-background"
-          />
-        </Button>
       </div>
     </header>
   );
