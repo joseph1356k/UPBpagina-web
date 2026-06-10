@@ -15,6 +15,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { saveSession } from "@/lib/session";
 import { ROUTES } from "@/lib/constants";
+import { USE_SUPABASE } from "@/lib/supabase/env";
 import { cn } from "@/lib/utils";
 import type { Ceremony, Graduate } from "@/lib/types";
 
@@ -22,7 +23,7 @@ import type { Ceremony, Graduate } from "@/lib/types";
 /*  Constants                                                         */
 /* ------------------------------------------------------------------ */
 
-/** Fixed OTP for the development mock. */
+/** Fixed OTP for the development mock (only used in mock mode). */
 const DEV_OTP = "123456";
 const MAX_ATTEMPTS = 5;
 const RESEND_COOLDOWN_S = 60;
@@ -135,47 +136,101 @@ export function OtpVerificationForm({
     setIsPending(true);
     setError(null);
 
-    // Simulate network latency
-    await new Promise<void>((r) => setTimeout(r, 600));
+    try {
+      if (USE_SUPABASE) {
+        // Real mode: call /api/auth/graduate/verify-otp, which sets the
+        // HttpOnly session cookie on success.
+        const res = await fetch("/api/auth/graduate/verify-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ graduateId: graduate.id, code: otp }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          attemptsLeft?: number;
+        };
 
-    if (otp !== DEV_OTP) {
-      const newAttempts = attempts + 1;
-      setAttempts(newAttempts);
-      const remaining = MAX_ATTEMPTS - newAttempts;
-      setError(
-        remaining > 0
-          ? `Código incorrecto. Te quedan ${remaining} intento${remaining !== 1 ? "s" : ""}.`
-          : "Has agotado todos tus intentos. Vuelve a la página de registro para comenzar de nuevo.",
-      );
-      setDigits(Array(DIGITS).fill(""));
+        if (!res.ok || json.ok !== true) {
+          const newAttempts = attempts + 1;
+          setAttempts(newAttempts);
+          const left =
+            typeof json.attemptsLeft === "number"
+              ? json.attemptsLeft
+              : Math.max(0, MAX_ATTEMPTS - newAttempts);
+          setError(
+            json.error === "expired"
+              ? "El código expiró. Solicita uno nuevo."
+              : json.error === "too_many_attempts"
+                ? "Has agotado tus intentos. Solicita un código nuevo."
+                : left > 0
+                  ? `Código incorrecto. Te quedan ${left} intento${left !== 1 ? "s" : ""}.`
+                  : "Has agotado todos tus intentos.",
+          );
+          setDigits(Array(DIGITS).fill(""));
+          setIsPending(false);
+          setTimeout(() => inputRefs.current[0]?.focus(), 50);
+          return;
+        }
+      } else {
+        // Mock mode: hardcoded OTP for local previews
+        await new Promise<void>((r) => setTimeout(r, 600));
+        if (otp !== DEV_OTP) {
+          const newAttempts = attempts + 1;
+          setAttempts(newAttempts);
+          const remaining = MAX_ATTEMPTS - newAttempts;
+          setError(
+            remaining > 0
+              ? `Código incorrecto. Te quedan ${remaining} intento${remaining !== 1 ? "s" : ""}.`
+              : "Has agotado todos tus intentos.",
+          );
+          setDigits(Array(DIGITS).fill(""));
+          setIsPending(false);
+          setTimeout(() => inputRefs.current[0]?.focus(), 50);
+          return;
+        }
+      }
+
+      // ✓ Success — persist UI state (server-side cookie already set)
+      setIsSuccess(true);
+      saveSession({
+        graduateId: graduate.id,
+        fullName: graduate.fullName,
+        ceremonyId: graduate.ceremonyId,
+        ceremonyName: ceremony.name,
+      });
+
+      await new Promise<void>((r) => setTimeout(r, 700));
+      router.push(ROUTES.portal);
+    } catch {
+      setError("No se pudo verificar el código. Intenta de nuevo.");
       setIsPending(false);
-      setTimeout(() => inputRefs.current[0]?.focus(), 50);
-      return;
     }
-
-    // ✓ Correct OTP
-    setIsSuccess(true);
-    saveSession({
-      graduateId: graduate.id,
-      fullName: graduate.fullName,
-      ceremonyId: graduate.ceremonyId,
-      ceremonyName: ceremony.name,
-    });
-
-    await new Promise<void>((r) => setTimeout(r, 700));
-    router.push(ROUTES.portal);
   }
 
   /* ── Resend ─────────────────────────────────────────────────────── */
 
-  function handleResend() {
+  async function handleResend() {
     if (resendCooldown > 0) return;
     setResendCooldown(RESEND_COOLDOWN_S);
     setAttempts(0);
     setError(null);
     setDigits(Array(DIGITS).fill(""));
     setTimeout(() => inputRefs.current[0]?.focus(), 50);
-    // In production: call an API to re-send the OTP email
+
+    if (USE_SUPABASE) {
+      try {
+        await fetch("/api/auth/graduate/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ documentNumber: graduate.documentNumber }),
+        });
+      } catch {
+        // silent — the user will see the existing code (if still valid) work
+      }
+    }
   }
 
   /* ── Success screen ─────────────────────────────────────────────── */
@@ -216,8 +271,8 @@ export function OtpVerificationForm({
           Volver al registro
         </Link>
 
-        {/* Dev banner */}
-        {process.env.NODE_ENV === "development" && (
+        {/* Dev banner — only in mock mode (real OTPs arrive by email) */}
+        {process.env.NODE_ENV === "development" && !USE_SUPABASE && (
           <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700 dark:border-amber-600/30 dark:bg-amber-900/20 dark:text-amber-400">
             <FlaskConical className="size-4 shrink-0" />
             <span>

@@ -141,60 +141,91 @@
 }
 
 .dark {
-  --background: oklch(0.15 0.020 28);
-  --foreground: oklch(0.96 0.006 60);
-  --card: oklch(0.21 0.024 28);
-  --card-foreground: oklch(0.96 0.006 60);
-  --popover: oklch(0.21 0.024 28);
-  --popover-foreground: oklch(0.96 0.006 60);
+  /* ────────────────────────────────────────────────────────────────
+     Dark mode — institutional UPB palette
+     Tuned for: AA contrast on body text, clear card elevation,
+     visible borders without harshness. The page background sits a
+     hair lighter than pure black so the brand red stays warm rather
+     than neon.
+     ──────────────────────────────────────────────────────────────── */
 
-  --primary: oklch(0.62 0.20 22);
-  --primary-foreground: oklch(0.15 0.020 28);
+  --background: oklch(0.18 0.018 28);
+  --foreground: oklch(0.97 0.005 60);
+  --card: oklch(0.24 0.020 28);
+  --card-foreground: oklch(0.97 0.005 60);
+  --popover: oklch(0.26 0.022 28);
+  --popover-foreground: oklch(0.97 0.005 60);
 
-  --secondary: oklch(0.28 0.030 22);
-  --secondary-foreground: oklch(0.96 0.006 60);
+  /* UPB red — lifted for dark backgrounds, keeps the institutional warmth */
+  --primary: oklch(0.66 0.21 22);
+  --primary-foreground: oklch(0.99 0.005 22);
 
-  --muted: oklch(0.26 0.022 28);
-  --muted-foreground: oklch(0.70 0.014 50);
+  --secondary: oklch(0.30 0.032 22);
+  --secondary-foreground: oklch(0.97 0.005 60);
 
-  --accent: oklch(0.30 0.040 22);
-  --accent-foreground: oklch(0.96 0.006 60);
+  --muted: oklch(0.27 0.016 28);
+  --muted-foreground: oklch(0.78 0.012 50);   /* AA on --background */
 
-  --destructive: oklch(0.70 0.20 22);
-  --destructive-foreground: oklch(0.96 0.006 22);
-  --success: oklch(0.65 0.15 152);
+  --accent: oklch(0.34 0.045 22);
+  --accent-foreground: oklch(0.97 0.005 60);
+
+  --destructive: oklch(0.68 0.21 22);
+  --destructive-foreground: oklch(0.99 0.005 22);
+  --success: oklch(0.72 0.16 152);
   --success-foreground: oklch(0.15 0.020 28);
-  --warning: oklch(0.78 0.15 75);
+  --warning: oklch(0.82 0.15 75);
   --warning-foreground: oklch(0.20 0.05 75);
-  --info: oklch(0.65 0.15 240);
+  --info: oklch(0.72 0.15 240);
   --info-foreground: oklch(0.15 0.020 28);
 
-  --border: oklch(1 0 0 / 0.10);
-  --input: oklch(1 0 0 / 0.15);
-  --ring: oklch(0.62 0.20 22);
+  /* Borders & inputs — visible at a glance without being harsh */
+  --border: oklch(1 0 0 / 0.14);
+  --input: oklch(1 0 0 / 0.18);
+  --ring: oklch(0.66 0.21 22 / 0.65);
 
-  --chart-1: oklch(0.65 0.20 22);
-  --chart-2: oklch(0.80 0.14 82);
+  --chart-1: oklch(0.70 0.20 22);
+  --chart-2: oklch(0.84 0.14 82);
   --chart-3: oklch(0.85 0.04 60);
-  --chart-4: oklch(0.70 0.13 200);
-  --chart-5: oklch(0.78 0.10 22);
+  --chart-4: oklch(0.74 0.13 200);
+  --chart-5: oklch(0.82 0.10 22);
 
-  --sidebar: oklch(0.18 0.022 28);
-  --sidebar-foreground: oklch(0.96 0.006 60);
-  --sidebar-primary: oklch(0.62 0.20 22);
-  --sidebar-primary-foreground: oklch(0.15 0.020 28);
-  --sidebar-accent: oklch(0.28 0.030 22);
-  --sidebar-accent-foreground: oklch(0.96 0.006 60);
+  --sidebar: oklch(0.16 0.020 28);            /* one step darker than bg */
+  --sidebar-foreground: oklch(0.97 0.005 60);
+  --sidebar-primary: oklch(0.66 0.21 22);
+  --sidebar-primary-foreground: oklch(0.99 0.005 22);
+  --sidebar-accent: oklch(0.30 0.032 22);
+  --sidebar-accent-foreground: oklch(0.97 0.005 60);
   --sidebar-border: oklch(1 0 0 / 0.10);
-  --sidebar-ring: oklch(0.62 0.20 22);
+  --sidebar-ring: oklch(0.66 0.21 22 / 0.65);
 
-  --brand-surface: oklch(0.18 0.022 28);
-  --brand-surface-elevated: oklch(0.21 0.024 28);
-  --brand-ink: oklch(0.96 0.006 60);
-  --brand-ink-muted: oklch(0.70 0.014 50);
-  --brand-gold: oklch(0.82 0.13 82);
-  --brand-red: oklch(0.62 0.20 22);
-  --brand-red-dark: oklch(0.50 0.18 22);
+  --brand-surface: oklch(0.20 0.020 28);
+  --brand-surface-elevated: oklch(0.26 0.022 28);
+  --brand-ink: oklch(0.97 0.005 60);
+  --brand-ink-muted: oklch(0.78 0.012 50);
+  --brand-gold: oklch(0.84 0.14 82);
+  --brand-red: oklch(0.66 0.21 22);
+  --brand-red-dark: oklch(0.52 0.19 22);
+}
+
+/* Subtle dark-mode polish on form controls — without overriding shadcn primitives */
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: color-mix(in oklch, var(--muted-foreground) 75%, transparent);
+}
+
+.dark input[type="date"],
+.dark input[type="time"],
+.dark input[type="datetime-local"],
+.dark input[type="month"],
+.dark input[type="week"] {
+  color-scheme: dark;
+}
+
+/* Sonner toasts blend with the dark surface without losing the brand accent */
+.dark [data-sonner-toaster] {
+  --normal-bg: var(--card);
+  --normal-text: var(--card-foreground);
+  --normal-border: var(--border);
 }
 
 @layer base {

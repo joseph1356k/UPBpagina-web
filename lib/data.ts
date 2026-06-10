@@ -11,21 +11,25 @@
  *   - "true"   → server-side calls go to the real Supabase (`lib/db`)
  *   - anything else → in-memory mock (`lib/mock`)
  *
- * ⚠ Client component behaviour:
- *   - Mock mode  → works (in-browser arrays)
- *   - Real mode  → DOES NOT WORK for mutations. Client components must
- *                  call /api/* endpoints instead. Mutations from client
- *                  components will throw a clear runtime error.
+ * ⚠ This module is **server-only** (because lib/db is). Client components
+ *   must import types only via `import type` syntax, and call /api/*
+ *   endpoints for mutations. Use lib/api-client for the client side.
  *
- * ─── Why no static import of lib/db ────────────────────────────────────
- *  lib/db transitively imports next/headers which is server-only.
- *  Even a `import type` was getting traced by webpack into client bundles.
- *  So the import is fully lazy + dynamic path string to defeat tracing.
+ * ─── History ──────────────────────────────────────────────────────────
+ *  Previous versions of this file used a runtime `await import(stringVar)`
+ *  trick to defeat webpack's static analysis. Turbopack (Next 16's default
+ *  bundler) doesn't honour that pattern and fails to resolve the module at
+ *  request time. The current approach is: static import lib/db, mark the
+ *  whole file as "server-only" so we get a clean error if anything client-
+ *  side tries to use it at runtime. Type-only imports work fine in client
+ *  code because TS erases them.
  */
 
-import { USE_SUPABASE } from "@/lib/supabase/env";
+import "server-only";
 
+import * as db from "@/lib/db";
 import * as mock from "@/lib/mock";
+import { USE_SUPABASE } from "@/lib/supabase/env";
 
 // Re-export types (type-only — erased at runtime, no bundle impact)
 export type {
@@ -44,37 +48,13 @@ export type {
   SimulatedScanResult,
   ScanEventRow,
   AuditLogRow,
+  BulkGraduateInput,
+  BulkImportResult,
 } from "@/lib/mock";
 
 /* ──────────────────────────────────────────────────────────────────
-   Lazy db loader — server only, defeats webpack tracing
+   Router factory — picks mock or db at module-load time per key
    ────────────────────────────────────────────────────────────────── */
-
-const isServer = typeof window === "undefined";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _real: any | null = null;
-
-async function loadReal() {
-  if (_real) return _real;
-  if (!isServer) {
-    throw new Error(
-      "[data] Real Supabase mode is server-only. Client components " +
-        "must call /api/* endpoints instead of importing from @/lib/data.",
-    );
-  }
-  // Dynamic path string defeats webpack's static analysis so lib/db
-  // never lands in client bundles. ⚠ Keep this pattern intact.
-  const modulePath = "./db";
-  _real = await import(/* webpackIgnore: true */ modulePath);
-  return _real;
-}
-
-/* ──────────────────────────────────────────────────────────────────
-   Router factory — wraps each mock function with runtime routing
-   ────────────────────────────────────────────────────────────────── */
-
-type AnyFn = (...args: never[]) => unknown;
 
 function route<K extends keyof typeof mock>(name: K): (typeof mock)[K] {
   const mockFn = mock[name];
@@ -82,16 +62,13 @@ function route<K extends keyof typeof mock>(name: K): (typeof mock)[K] {
   if (!USE_SUPABASE) return mockFn;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (async (...args: any[]) => {
-    const real = await loadReal();
-    const realFn = real[name] as AnyFn | undefined;
-    if (!realFn) {
-      throw new Error(
-        `[data] Function "${String(name)}" not implemented in lib/db.`,
-      );
-    }
-    return realFn(...(args as never[]));
-  }) as unknown as (typeof mock)[K];
+  const realFn = (db as any)[name];
+  if (typeof realFn !== "function") {
+    throw new Error(
+      `[data] Function "${String(name)}" not implemented in lib/db.`,
+    );
+  }
+  return realFn as (typeof mock)[K];
 }
 
 /* ──────────────────────────────────────────────────────────────────
@@ -140,8 +117,7 @@ export const getInvitationByToken  = route("getInvitationByToken");
 export const simulateScan          = route("simulateScan");
 
 /* ──────────────────────────────────────────────────────────────────
-   Mutations — note: in Supabase mode these are server-only.
-   Client components must use /api/* endpoints.
+   Mutations — server-only. Client components use lib/api-client.
    ────────────────────────────────────────────────────────────────── */
 
 export const createCeremony        = route("createCeremony");
@@ -150,3 +126,4 @@ export const updateGraduateAdmin   = route("updateGraduateAdmin");
 export const revokeGuestAdmin      = route("revokeGuestAdmin");
 export const createUser            = route("createUser");
 export const updateUser            = route("updateUser");
+export const bulkCreateGraduates   = route("bulkCreateGraduates");

@@ -516,6 +516,98 @@ export async function updateGraduateAdmin(
   return graduateFromRow(row);
 }
 
+export interface BulkGraduateInput {
+  documentType: Graduate["documentType"];
+  documentNumber: string;
+  studentCode: string;
+  fullName: string;
+  email: string;
+  program: string;
+  faculty: string;
+  maxGuests?: number | null;
+  status?: Graduate["status"];
+}
+
+export interface BulkImportResult {
+  inserted: number;
+  skipped: number;
+  errors: Array<{ documentNumber: string; reason: string }>;
+}
+
+/**
+ * Bulk-insert graduates for a ceremony.
+ *
+ * Uses the service role (admin-only endpoint already gated upstream) so we
+ * can bypass per-row RLS overhead and use ON CONFLICT to skip duplicates
+ * cleanly. Defaults `max_guests` to the ceremony's `max_guests_default`
+ * when not specified.
+ *
+ * Returns a summary so the UI can show "X importados, Y duplicados".
+ */
+export async function bulkCreateGraduates(
+  ceremonyId: string,
+  rows: BulkGraduateInput[],
+): Promise<BulkImportResult> {
+  if (rows.length === 0) {
+    return { inserted: 0, skipped: 0, errors: [] };
+  }
+
+  const service = createServiceClient();
+
+  // Look up ceremony default cupo so we can fill in maxGuests when null.
+  const { data: ceremony, error: cerErr } = await service
+    .from("ceremonies")
+    .select("max_guests_default")
+    .eq("id", ceremonyId)
+    .single();
+  if (cerErr || !ceremony) {
+    throw new Error("ceremony_not_found");
+  }
+  const defaultCupos = ceremony.max_guests_default;
+
+  // Build the insert payload. Map camelCase → snake_case at the boundary.
+  const payload = rows.map((r) => ({
+    ceremony_id: ceremonyId,
+    document_type: r.documentType,
+    document_number: r.documentNumber,
+    student_code: r.studentCode || r.documentNumber, // fallback to doc# if empty
+    full_name: r.fullName,
+    email: r.email,
+    program: r.program,
+    faculty: r.faculty,
+    max_guests:
+      r.maxGuests !== null && r.maxGuests !== undefined && !isNaN(r.maxGuests)
+        ? r.maxGuests
+        : defaultCupos,
+    status: r.status ?? "eligible",
+  }));
+
+  // ON CONFLICT (ceremony_id, document_number) DO NOTHING → idempotent re-import.
+  // Postgrest's upsert with ignoreDuplicates does exactly that.
+  const { data, error } = await service
+    .from("graduates")
+    .upsert(payload, {
+      onConflict: "ceremony_id,document_number",
+      ignoreDuplicates: true,
+    })
+    .select("id");
+
+  if (error) {
+    return {
+      inserted: 0,
+      skipped: 0,
+      errors: [{ documentNumber: "*", reason: error.message }],
+    };
+  }
+
+  const inserted = data?.length ?? 0;
+  return {
+    inserted,
+    skipped: rows.length - inserted,
+    errors: [],
+  };
+}
+
 export async function revokeGuestAdmin(id: string): Promise<Guest> {
   const supabase = await createClient();
   const { data: row, error } = await supabase

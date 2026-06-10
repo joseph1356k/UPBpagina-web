@@ -403,6 +403,72 @@ export async function updateGraduateAdmin(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Bulk import (used by /api/admin/graduates/import)                 */
+/* ------------------------------------------------------------------ */
+
+export interface BulkGraduateInput {
+  documentType: Graduate["documentType"];
+  documentNumber: string;
+  studentCode: string;
+  fullName: string;
+  email: string;
+  program: string;
+  faculty: string;
+  maxGuests?: number | null;
+  status?: Graduate["status"];
+}
+
+export interface BulkImportResult {
+  inserted: number;
+  skipped: number;
+  errors: Array<{ documentNumber: string; reason: string }>;
+}
+
+export async function bulkCreateGraduates(
+  ceremonyId: string,
+  rows: BulkGraduateInput[],
+): Promise<BulkImportResult> {
+  await delay();
+  const ceremony = ceremoniesSeed.find((c) => c.id === ceremonyId);
+  if (!ceremony) throw new Error("ceremony_not_found");
+
+  let inserted = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const dup = graduatesSeed.some(
+      (g) =>
+        g.ceremonyId === ceremonyId &&
+        g.documentNumber === row.documentNumber,
+    );
+    if (dup) {
+      skipped++;
+      continue;
+    }
+    const now = new Date().toISOString();
+    graduatesSeed.push({
+      id: `grad_mock_${Date.now()}_${inserted}`,
+      ceremonyId,
+      documentType: row.documentType,
+      documentNumber: row.documentNumber,
+      studentCode: row.studentCode || row.documentNumber,
+      fullName: row.fullName,
+      email: row.email,
+      program: row.program,
+      faculty: row.faculty,
+      maxGuests:
+        row.maxGuests !== null && row.maxGuests !== undefined && !isNaN(row.maxGuests)
+          ? row.maxGuests
+          : ceremony.maxGuestsDefault,
+      status: row.status ?? "eligible",
+      createdAt: now,
+      updatedAt: now,
+    });
+    inserted++;
+  }
+  return { inserted, skipped, errors: [] };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Invitation token lookup                                           */
 /* ------------------------------------------------------------------ */
 

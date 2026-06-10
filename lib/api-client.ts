@@ -19,7 +19,14 @@
 
 "use client";
 
-import * as data from "@/lib/data";
+// Import TYPES only from lib/data — it's marked "server-only" since it
+// statically pulls in lib/db (which uses next/headers). Type-only imports
+// are erased at build, so this is safe in client code.
+import type * as data from "@/lib/data";
+
+// Runtime mutation implementations for mock mode come from lib/mock directly
+// (client-safe — pure in-memory arrays). Real-mode mutations go through fetch.
+import * as mock from "@/lib/mock";
 import type {
   Ceremony,
   Graduate,
@@ -71,7 +78,7 @@ async function call<T>(path: string, opts: FetchOpts): Promise<T> {
 export const adminApi = {
   ceremonies: {
     async create(input: data.CreateCeremonyInput): Promise<Ceremony> {
-      if (!USE_SUPABASE) return data.createCeremony(input);
+      if (!USE_SUPABASE) return mock.createCeremony(input);
       const r = await call<{ ceremony: Ceremony }>("/api/admin/ceremonies", {
         method: "POST",
         body: input,
@@ -79,7 +86,7 @@ export const adminApi = {
       return r.ceremony;
     },
     async update(id: string, patch: data.UpdateCeremonyInput): Promise<Ceremony> {
-      if (!USE_SUPABASE) return data.updateCeremony(id, patch);
+      if (!USE_SUPABASE) return mock.updateCeremony(id, patch);
       const r = await call<{ ceremony: Ceremony }>(
         `/api/admin/ceremonies/${encodeURIComponent(id)}`,
         { method: "PATCH", body: patch },
@@ -90,7 +97,7 @@ export const adminApi = {
 
   users: {
     async create(input: data.CreateUserInput): Promise<User> {
-      if (!USE_SUPABASE) return data.createUser(input);
+      if (!USE_SUPABASE) return mock.createUser(input);
       const r = await call<{ user: User }>("/api/admin/users", {
         method: "POST",
         body: input,
@@ -98,7 +105,7 @@ export const adminApi = {
       return r.user;
     },
     async update(id: string, patch: data.UpdateUserInput): Promise<User> {
-      if (!USE_SUPABASE) return data.updateUser(id, patch);
+      if (!USE_SUPABASE) return mock.updateUser(id, patch);
       const r = await call<{ user: User }>(
         `/api/admin/users/${encodeURIComponent(id)}`,
         { method: "PATCH", body: patch },
@@ -112,18 +119,28 @@ export const adminApi = {
       id: string,
       patch: Patch<Graduate>,
     ): Promise<Graduate> {
-      if (!USE_SUPABASE) return data.updateGraduateAdmin(id, patch);
+      if (!USE_SUPABASE) return mock.updateGraduateAdmin(id, patch);
       const r = await call<{ graduate: Graduate }>(
         `/api/admin/graduates/${encodeURIComponent(id)}`,
         { method: "PATCH", body: patch },
       );
       return r.graduate;
     },
+    async bulkImport(
+      ceremonyId: string,
+      rows: data.BulkGraduateInput[],
+    ): Promise<data.BulkImportResult> {
+      if (!USE_SUPABASE) return mock.bulkCreateGraduates(ceremonyId, rows);
+      return call<data.BulkImportResult & { ok: true }>(
+        "/api/admin/graduates/import",
+        { method: "POST", body: { ceremonyId, rows } },
+      );
+    },
   },
 
   guests: {
     async revoke(id: string): Promise<Guest> {
-      if (!USE_SUPABASE) return data.revokeGuestAdmin(id);
+      if (!USE_SUPABASE) return mock.revokeGuestAdmin(id);
       const r = await call<{ guest: Guest }>(
         `/api/admin/guests/${encodeURIComponent(id)}/revoke`,
         { method: "POST" },

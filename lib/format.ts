@@ -52,15 +52,20 @@ export function formatDateShort(iso: string): string {
   return shortDateFormatter.format(new Date(iso));
 }
 
-export function formatTime(value: string): string {
-  // Accepts either "HH:mm" or full ISO
-  if (/^\d{2}:\d{2}$/.test(value)) {
-    const [h, m] = value.split(":").map(Number);
+export function formatTime(value: string | null | undefined): string {
+  if (!value) return "";
+  // Accepts "HH:mm", "HH:mm:ss" (Postgres TIME), or full ISO 8601
+  const match = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(value);
+  if (match) {
+    const h = Number(match[1]);
+    const m = Number(match[2]);
     const tmp = new Date();
     tmp.setHours(h, m, 0, 0);
     return timeFormatter.format(tmp);
   }
-  return timeFormatter.format(new Date(value));
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value; // graceful fallback
+  return timeFormatter.format(d);
 }
 
 export function formatDateTime(iso: string): string {

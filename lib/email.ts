@@ -12,6 +12,7 @@ import { Resend } from "resend";
 
 const FROM = process.env.RESEND_FROM ?? "UPB Ceremonias <ceremonias@upb.edu.co>";
 const API_KEY = process.env.RESEND_API_KEY;
+const TEST_REDIRECT = process.env.RESEND_TEST_REDIRECT?.trim() || null;
 
 let _client: Resend | null = null;
 function client(): Resend | null {
@@ -42,10 +43,25 @@ export async function sendEmail(args: SendArgs): Promise<{ id: string }> {
     return { id: `dev_${Date.now()}` };
   }
 
+  // Test mode: redirect every send to a single mailbox so Resend's
+  // "you can only send to your own email" restriction (free tier without
+  // verified domain) doesn't break the flow. The original recipient is
+  // injected into the subject so testers can tell who it was for.
+  const recipient = TEST_REDIRECT ?? args.to;
+  const subject = TEST_REDIRECT
+    ? `[→ ${args.to}] ${args.subject}`
+    : args.subject;
+
+  if (TEST_REDIRECT) {
+    console.warn(
+      `[email] TEST_REDIRECT active — sending to ${TEST_REDIRECT} instead of ${args.to}`,
+    );
+  }
+
   const { data, error } = await c.emails.send({
     from: FROM,
-    to: [args.to],
-    subject: args.subject,
+    to: [recipient],
+    subject,
     html: args.html,
     text: args.text,
   });

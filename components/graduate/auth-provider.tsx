@@ -13,7 +13,11 @@ import { Loader2 } from "lucide-react";
 
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ROUTES } from "@/lib/constants";
-import { getCeremony, getGraduate, getGuests } from "@/lib/data";
+// Client-safe data sources:
+//   - Mock mode: in-memory arrays from lib/mock
+//   - Real mode: /api/graduate/* endpoints (validated by session cookie)
+import { getCeremony, getGraduate, getGuests } from "@/lib/mock";
+import { USE_SUPABASE } from "@/lib/supabase/env";
 import {
   clearSession,
   getSession,
@@ -129,14 +133,46 @@ export function GraduateAuthProvider({ children }: ProviderProps) {
         return;
       }
 
-      // Pull related entities in parallel
-      const [graduate, ceremony, guests] = await Promise.all([
-        getGraduate(session.graduateId),
-        getCeremony(session.ceremonyId),
-        getGuests({ graduateId: session.graduateId }),
-      ]);
+      let graduate: Graduate | null;
+      let ceremony: Ceremony | null;
+      let guests: Guest[];
 
-      // Defensive: session points at something we can't find
+      if (USE_SUPABASE) {
+        // Real mode: one round trip to /api/graduate/me; the cookie is
+        // attached automatically and the server filters by it.
+        try {
+          const res = await fetch("/api/graduate/me", {
+            credentials: "same-origin",
+            cache: "no-store",
+          });
+          if (!res.ok) {
+            clearSession();
+            router.replace(ROUTES.registro);
+            return;
+          }
+          const json = (await res.json()) as {
+            ok: boolean;
+            graduate: Graduate;
+            ceremony: Ceremony;
+            guests: Guest[];
+          };
+          graduate = json.graduate;
+          ceremony = json.ceremony;
+          guests = json.guests ?? [];
+        } catch {
+          clearSession();
+          router.replace(ROUTES.registro);
+          return;
+        }
+      } else {
+        // Mock mode: lookup in-memory arrays
+        [graduate, ceremony, guests] = await Promise.all([
+          getGraduate(session.graduateId),
+          getCeremony(session.ceremonyId),
+          getGuests({ graduateId: session.graduateId }),
+        ]);
+      }
+
       if (!graduate || !ceremony) {
         clearSession();
         router.replace(ROUTES.registro);
@@ -168,22 +204,49 @@ export function GraduateAuthProvider({ children }: ProviderProps) {
         throw new Error("Has alcanzado el máximo de invitados permitidos.");
       }
 
-      await delay();
+      let newGuest: Guest;
 
-      const newGuest: Guest = {
-        id: `gst_new_${randomId()}`,
-        graduateId: state.graduate.id,
-        fullName: input.fullName.trim(),
-        documentNumber: input.documentNumber?.trim() || null,
-        email: input.email?.trim() || null,
-        relationship: input.relationship?.trim() || null,
-        status: "pending",
-        invitationToken: `tok_${randomId()}${randomId()}`,
-        invitedAt: null,
-        checkedInAt: null,
-        createdAt: nowIso(),
-        updatedAt: nowIso(),
-      };
+      if (USE_SUPABASE) {
+        const res = await fetch("/api/graduate/guests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            fullName: input.fullName.trim(),
+            documentNumber: input.documentNumber?.trim() || null,
+            email: input.email?.trim() || null,
+            relationship: input.relationship?.trim() || null,
+          }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          guest?: Guest;
+          error?: string;
+        };
+        if (!res.ok || json.ok !== true || !json.guest) {
+          if (json.error === "quota_exceeded") {
+            throw new Error("Has alcanzado el máximo de invitados permitidos.");
+          }
+          throw new Error("No se pudo crear el invitado.");
+        }
+        newGuest = json.guest;
+      } else {
+        await delay();
+        newGuest = {
+          id: `gst_new_${randomId()}`,
+          graduateId: state.graduate.id,
+          fullName: input.fullName.trim(),
+          documentNumber: input.documentNumber?.trim() || null,
+          email: input.email?.trim() || null,
+          relationship: input.relationship?.trim() || null,
+          status: "pending",
+          invitationToken: `tok_${randomId()}${randomId()}`,
+          invitedAt: null,
+          checkedInAt: null,
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+      }
 
       setState((prev) => {
         if (prev.status !== "ready") return prev;
@@ -208,25 +271,55 @@ export function GraduateAuthProvider({ children }: ProviderProps) {
         );
       }
 
-      await delay();
+      let updated: Guest;
 
-      const updated: Guest = {
-        ...target,
-        fullName: patch.fullName?.trim() ?? target.fullName,
-        documentNumber:
-          patch.documentNumber === undefined
-            ? target.documentNumber
-            : patch.documentNumber?.trim() || null,
-        email:
-          patch.email === undefined
-            ? target.email
-            : patch.email?.trim() || null,
-        relationship:
-          patch.relationship === undefined
-            ? target.relationship
-            : patch.relationship?.trim() || null,
-        updatedAt: nowIso(),
-      };
+      if (USE_SUPABASE) {
+        const res = await fetch(`/api/graduate/guests/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            fullName: patch.fullName?.trim(),
+            documentNumber:
+              patch.documentNumber === undefined
+                ? undefined
+                : patch.documentNumber?.trim() || null,
+            email:
+              patch.email === undefined ? undefined : patch.email?.trim() || null,
+            relationship:
+              patch.relationship === undefined
+                ? undefined
+                : patch.relationship?.trim() || null,
+          }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          guest?: Guest;
+        };
+        if (!res.ok || json.ok !== true || !json.guest) {
+          throw new Error("No se pudo actualizar el invitado.");
+        }
+        updated = json.guest;
+      } else {
+        await delay();
+        updated = {
+          ...target,
+          fullName: patch.fullName?.trim() ?? target.fullName,
+          documentNumber:
+            patch.documentNumber === undefined
+              ? target.documentNumber
+              : patch.documentNumber?.trim() || null,
+          email:
+            patch.email === undefined
+              ? target.email
+              : patch.email?.trim() || null,
+          relationship:
+            patch.relationship === undefined
+              ? target.relationship
+              : patch.relationship?.trim() || null,
+          updatedAt: nowIso(),
+        };
+      }
 
       setState((prev) => {
         if (prev.status !== "ready") return prev;
@@ -252,6 +345,32 @@ export function GraduateAuthProvider({ children }: ProviderProps) {
         throw new Error(
           "No puedes eliminar a un invitado que ya ingresó a la ceremonia.",
         );
+      }
+
+      if (USE_SUPABASE) {
+        const res = await fetch(`/api/graduate/guests/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+          credentials: "same-origin",
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          mode?: "revoked" | "deleted";
+          guest?: Guest;
+        };
+        if (!res.ok || json.ok !== true) {
+          throw new Error("No se pudo eliminar el invitado.");
+        }
+        setState((prev) => {
+          if (prev.status !== "ready") return prev;
+          if (json.mode === "revoked" && json.guest) {
+            return {
+              ...prev,
+              guests: prev.guests.map((g) => (g.id === id ? json.guest! : g)),
+            };
+          }
+          return { ...prev, guests: prev.guests.filter((g) => g.id !== id) };
+        });
+        return;
       }
 
       await delay();
@@ -290,6 +409,39 @@ export function GraduateAuthProvider({ children }: ProviderProps) {
       throw new Error("No hay invitados pendientes por enviar.");
     }
 
+    if (USE_SUPABASE) {
+      const res = await fetch("/api/guests/send-invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ graduateId: state.graduate.id }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        sent?: number;
+        skipped?: number;
+        error?: string;
+      };
+      if (!res.ok || json.ok !== true) {
+        throw new Error("No se pudieron enviar las invitaciones.");
+      }
+
+      // Reflect the new statuses locally
+      const ts = nowIso();
+      setState((prev) => {
+        if (prev.status !== "ready") return prev;
+        return {
+          ...prev,
+          guests: prev.guests.map((g) =>
+            g.status === "pending"
+              ? { ...g, status: "invited" as const, invitedAt: ts, updatedAt: ts }
+              : g,
+          ),
+        };
+      });
+      return { sent: json.sent ?? pending.length };
+    }
+
     await delay(700);
 
     const ts = nowIso();
@@ -310,6 +462,13 @@ export function GraduateAuthProvider({ children }: ProviderProps) {
 
   const signOut = useCallback(() => {
     clearSession();
+    if (USE_SUPABASE) {
+      // Fire-and-forget — revokes the token server-side too
+      void fetch("/api/auth/graduate/sign-out", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+    }
     router.replace(ROUTES.registro);
   }, [router]);
 

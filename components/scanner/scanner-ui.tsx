@@ -21,7 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { simulateScan, type SimulatedScanResult } from "@/lib/data";
+// Client-side: lib/data is server-only. Mock simulator for offline preview,
+// real scans go through POST /api/qr/validate.
+import { simulateScan, type SimulatedScanResult } from "@/lib/mock";
 import { ROUTES, SCAN_DENIED_REASON_LABEL } from "@/lib/constants";
 import { formatDocument, formatInitials, formatTime } from "@/lib/format";
 import { useOnline } from "@/lib/pwa/use-online";

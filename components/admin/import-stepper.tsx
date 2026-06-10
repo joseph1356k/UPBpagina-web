@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   AlertTriangle,
@@ -31,6 +33,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { adminApi } from "@/lib/api-client";
+import {
+  parseGraduatesFile,
+  type ParsedGraduateRow,
+} from "@/lib/excel/parse-graduates";
 import type { Ceremony } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -39,96 +46,6 @@ import { cn } from "@/lib/utils";
 /* ------------------------------------------------------------------ */
 
 type Step = "upload" | "preview" | "validate" | "confirm" | "done";
-
-interface ParsedRow {
-  rowNumber: number;
-  documentType: string;
-  documentNumber: string;
-  studentCode: string;
-  fullName: string;
-  email: string;
-  program: string;
-  faculty: string;
-  validation: "ok" | "warning" | "error";
-  issue?: string;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Mock parser — generates a fake preview                             */
-/* ------------------------------------------------------------------ */
-
-const SAMPLE_FIRST_NAMES = [
-  "María",
-  "Andrés",
-  "Camila",
-  "Sebastián",
-  "Valentina",
-  "Daniel",
-  "Sofía",
-  "Tomás",
-  "Isabella",
-  "Mateo",
-  "Laura",
-  "Felipe",
-];
-const SAMPLE_LAST_NAMES = [
-  "Pérez Ruiz",
-  "Restrepo Mejía",
-  "Gómez Arias",
-  "Henao Salazar",
-  "Vélez Cardona",
-  "Ríos Mora",
-  "Castaño Vargas",
-  "Ospina Quintero",
-];
-
-function buildSampleRows(count: number): ParsedRow[] {
-  const rows: ParsedRow[] = [];
-  for (let i = 0; i < count; i++) {
-    const first = SAMPLE_FIRST_NAMES[i % SAMPLE_FIRST_NAMES.length];
-    const last = SAMPLE_LAST_NAMES[(i * 3) % SAMPLE_LAST_NAMES.length];
-    const fullName = `${first} ${last}`;
-    const docNum = String(1_000_000_000 + i * 47_113);
-    const code = `00000${4000 + i}`.slice(-6);
-
-    let validation: ParsedRow["validation"] = "ok";
-    let issue: string | undefined;
-    if (i === 3) {
-      validation = "warning";
-      issue = "Correo institucional con dominio inusual";
-    } else if (i === 7) {
-      validation = "error";
-      issue = "Documento duplicado en la importación";
-    } else if (i === 11) {
-      validation = "warning";
-      issue = "Falta el código estudiantil — se generará uno temporal";
-    }
-
-    rows.push({
-      rowNumber: i + 2, // +2 because row 1 is the header
-      documentType: i % 5 === 0 ? "CE" : "CC",
-      documentNumber: docNum,
-      studentCode: validation === "warning" && i === 11 ? "" : code,
-      fullName,
-      email: `${first.toLowerCase()}.${last.split(" ")[0].toLowerCase()}@upb.edu.co`,
-      program:
-        i % 3 === 0
-          ? "Ingeniería de Sistemas"
-          : i % 3 === 1
-            ? "Administración de Empresas"
-            : "Comunicación Social",
-      faculty:
-        i % 3 === 0
-          ? "Facultad de Ingenierías"
-          : i % 3 === 1
-            ? "Facultad de Ciencias Económicas, Administrativas y Contables"
-            : "Facultad de Comunicaciones",
-      validation,
-      issue,
-    });
-  }
-  return rows;
-}
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -139,12 +56,19 @@ interface Props {
 }
 
 export function ImportStepper({ ceremonies }: Props) {
+  const router = useRouter();
   const [step, setStep] = useState<Step>("upload");
   const [ceremonyId, setCeremonyId] = useState<string>(
     ceremonies.find((c) => c.status === "open")?.id ?? ceremonies[0]?.id ?? "",
   );
   const [fileName, setFileName] = useState<string | null>(null);
-  const [rows, setRows] = useState<ParsedRow[]>([]);
+  const [rows, setRows] = useState<ParsedGraduateRow[]>([]);
+  const [unmappedHeaders, setUnmappedHeaders] = useState<string[]>([]);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [insertResult, setInsertResult] = useState<{
+    inserted: number;
+    skipped: number;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const activeCeremony = ceremonies.find((c) => c.id === ceremonyId);
@@ -159,21 +83,67 @@ export function ImportStepper({ ceremonies }: Props) {
       toast.error("Formato no soportado. Usa .xlsx, .xls o .csv.");
       return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("El archivo supera los 5 MB.");
+      return;
+    }
     setFileName(file.name);
+    setParseError(null);
     startTransition(async () => {
-      // Simulate parse delay
-      await new Promise((r) => setTimeout(r, 700));
-      const parsed = buildSampleRows(12);
-      setRows(parsed);
-      setStep("preview");
+      try {
+        const parsed = await parseGraduatesFile(file);
+        if (parsed.rows.length === 0) {
+          throw new Error("El archivo no contiene filas válidas.");
+        }
+        setRows(parsed.rows);
+        setUnmappedHeaders(parsed.unmappedHeaders);
+        setStep("preview");
+      } catch (err) {
+        setParseError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo procesar el archivo.",
+        );
+        toast.error("Error al procesar el archivo");
+      }
     });
   }
 
   function handleConfirm() {
+    if (!ceremonyId) return;
+    const payload = rows
+      .filter((r) => r.validation !== "error")
+      .map((r) => ({
+        documentType: r.documentType,
+        documentNumber: r.documentNumber,
+        studentCode: r.studentCode,
+        fullName: r.fullName,
+        email: r.email,
+        program: r.program,
+        faculty: r.faculty,
+        maxGuests: r.maxGuests,
+        status: r.status,
+      }));
+
     startTransition(async () => {
-      await new Promise((r) => setTimeout(r, 800));
-      setStep("done");
-      toast.success(`${importable} graduandos importados correctamente`);
+      try {
+        const result = await adminApi.graduates.bulkImport(ceremonyId, payload);
+        setInsertResult({
+          inserted: result.inserted,
+          skipped: result.skipped,
+        });
+        setStep("done");
+        toast.success(
+          `${result.inserted} graduandos importados${
+            result.skipped > 0 ? ` · ${result.skipped} duplicados omitidos` : ""
+          }`,
+        );
+        // Bust the cache so the dashboard + lists refetch
+        router.refresh();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "import_failed";
+        toast.error(`Error al importar: ${msg}`);
+      }
     });
   }
 
@@ -181,6 +151,9 @@ export function ImportStepper({ ceremonies }: Props) {
     setStep("upload");
     setFileName(null);
     setRows([]);
+    setUnmappedHeaders([]);
+    setParseError(null);
+    setInsertResult(null);
   }
 
   return (
@@ -195,6 +168,7 @@ export function ImportStepper({ ceremonies }: Props) {
           onCeremonyChange={setCeremonyId}
           onFile={handleFile}
           isPending={isPending}
+          parseError={parseError}
         />
       )}
 
@@ -203,6 +177,7 @@ export function ImportStepper({ ceremonies }: Props) {
         <PreviewStep
           fileName={fileName ?? ""}
           rows={rows}
+          unmappedHeaders={unmappedHeaders}
           ceremony={activeCeremony ?? null}
           onBack={reset}
           onNext={() => setStep("validate")}
@@ -236,7 +211,8 @@ export function ImportStepper({ ceremonies }: Props) {
       {/* Done */}
       {step === "done" && (
         <DoneStep
-          importable={importable}
+          inserted={insertResult?.inserted ?? importable}
+          skipped={insertResult?.skipped ?? 0}
           ceremony={activeCeremony ?? null}
           onAnother={reset}
         />
@@ -257,7 +233,8 @@ const STEPS: { key: Step; label: string }[] = [
 ];
 
 function StepIndicator({ current }: { current: Step }) {
-  const currentIdx = current === "done" ? STEPS.length : STEPS.findIndex((s) => s.key === current);
+  const currentIdx =
+    current === "done" ? STEPS.length : STEPS.findIndex((s) => s.key === current);
   return (
     <ol className="flex items-center gap-2 overflow-x-auto">
       {STEPS.map((s, i) => {
@@ -309,12 +286,14 @@ function UploadStep({
   onCeremonyChange,
   onFile,
   isPending,
+  parseError,
 }: {
   ceremonies: Ceremony[];
   ceremonyId: string;
   onCeremonyChange: (id: string) => void;
   onFile: (file: File) => void;
   isPending: boolean;
+  parseError: string | null;
 }) {
   const [dragOver, setDragOver] = useState(false);
 
@@ -397,6 +376,16 @@ function UploadStep({
             </p>
           </div>
         </label>
+
+        {parseError && (
+          <div
+            role="alert"
+            className="flex gap-2.5 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2.5"
+          >
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" />
+            <p className="text-sm text-destructive">{parseError}</p>
+          </div>
+        )}
       </div>
 
       <aside className="space-y-3 rounded-xl border border-border bg-muted/20 p-5 text-sm">
@@ -405,13 +394,14 @@ function UploadStep({
         </p>
         <ul className="space-y-1.5 text-foreground">
           {[
-            "Tipo de documento (CC / CE / TI / PP)",
-            "Número de documento",
+            "Tipo de documento (opcional, por defecto CC)",
+            "Número de documento *",
             "Código estudiantil",
-            "Nombre completo",
-            "Correo institucional",
-            "Programa",
-            "Facultad",
+            "Nombre completo *",
+            "Correo institucional *",
+            "Programa *",
+            "Facultad *",
+            "Cupos (opcional)",
           ].map((c) => (
             <li key={c} className="flex gap-1.5">
               <span aria-hidden className="text-primary">·</span>
@@ -421,8 +411,9 @@ function UploadStep({
         </ul>
         <Separator />
         <p className="text-xs leading-relaxed text-muted-foreground">
-          El sistema detecta automáticamente los encabezados. Las columnas
-          extra se ignoran. Las filas vacías se descartan.
+          Los encabezados se detectan automáticamente y aceptan variantes
+          comunes (ej: &quot;cédula&quot;, &quot;cc&quot;, &quot;documento&quot;).
+          Las columnas extra se ignoran. Las filas vacías se descartan.
         </p>
       </aside>
     </div>
@@ -436,19 +427,21 @@ function UploadStep({
 function PreviewStep({
   fileName,
   rows,
+  unmappedHeaders,
   ceremony,
   onBack,
   onNext,
 }: {
   fileName: string;
-  rows: ParsedRow[];
+  rows: ParsedGraduateRow[];
+  unmappedHeaders: string[];
   ceremony: Ceremony | null;
   onBack: () => void;
   onNext: () => void;
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <FileSpreadsheet className="size-5 text-primary" />
           <div>
@@ -465,40 +458,53 @@ function PreviewStep({
         </Button>
       </div>
 
+      {unmappedHeaders.length > 0 && (
+        <div className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning-foreground">
+          Columnas no reconocidas (se ignoran): {unmappedHeaders.join(", ")}
+        </div>
+      )}
+
       <div className="rounded-xl border border-border bg-card shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="w-10 pl-4">#</TableHead>
-              <TableHead>Nombre</TableHead>
-              <TableHead className="hidden sm:table-cell">Documento</TableHead>
-              <TableHead className="hidden md:table-cell">Código</TableHead>
-              <TableHead className="hidden lg:table-cell">Programa</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.rowNumber}>
-                <TableCell className="pl-4 text-xs text-muted-foreground tabular-nums">
-                  {r.rowNumber}
-                </TableCell>
-                <TableCell>
-                  <p className="font-medium text-foreground">{r.fullName}</p>
-                  <p className="text-xs text-muted-foreground">{r.email}</p>
-                </TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground tabular-nums sm:table-cell">
-                  {r.documentType} {r.documentNumber}
-                </TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground tabular-nums md:table-cell">
-                  {r.studentCode || "—"}
-                </TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
-                  {r.program}
-                </TableCell>
+        <div className="max-h-[480px] overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-10 pl-4">#</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead className="hidden sm:table-cell">Documento</TableHead>
+                <TableHead className="hidden md:table-cell">Código</TableHead>
+                <TableHead className="hidden lg:table-cell">Programa</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {rows.slice(0, 100).map((r) => (
+                <TableRow key={r.rowNumber}>
+                  <TableCell className="pl-4 text-xs text-muted-foreground tabular-nums">
+                    {r.rowNumber}
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-medium text-foreground">{r.fullName || "—"}</p>
+                    <p className="text-xs text-muted-foreground">{r.email}</p>
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground tabular-nums sm:table-cell">
+                    {r.documentType} {r.documentNumber}
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground tabular-nums md:table-cell">
+                    {r.studentCode || "—"}
+                  </TableCell>
+                  <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                    {r.program}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {rows.length > 100 && (
+            <p className="px-4 py-2 text-xs text-muted-foreground">
+              Mostrando 100 de {rows.length} filas — todas se validarán en el siguiente paso.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-end gap-2">
@@ -527,13 +533,15 @@ function ValidateStep({
   onBack,
   onNext,
 }: {
-  rows: ParsedRow[];
+  rows: ParsedGraduateRow[];
   okCount: number;
   warnCount: number;
   errorCount: number;
   onBack: () => void;
   onNext: () => void;
 }) {
+  const issues = rows.filter((r) => r.validation !== "ok");
+
   return (
     <div className="space-y-4">
       {/* Summary */}
@@ -561,47 +569,45 @@ function ValidateStep({
       </div>
 
       {/* Rows with issues */}
-      {(warnCount > 0 || errorCount > 0) && (
+      {issues.length > 0 && (
         <div className="rounded-xl border border-border bg-card shadow-sm">
           <div className="border-b border-border px-4 py-3">
             <h3 className="text-sm font-medium text-foreground">
               Filas que requieren atención
             </h3>
           </div>
-          <ul className="divide-y divide-border">
-            {rows
-              .filter((r) => r.validation !== "ok")
-              .map((r) => (
-                <li
-                  key={r.rowNumber}
-                  className="flex items-start gap-3 px-4 py-3"
+          <ul className="max-h-[360px] divide-y divide-border overflow-auto">
+            {issues.slice(0, 200).map((r) => (
+              <li
+                key={r.rowNumber}
+                className="flex items-start gap-3 px-4 py-3"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
+                    r.validation === "error"
+                      ? "bg-destructive/10 text-destructive"
+                      : "bg-warning/15 text-warning",
+                  )}
                 >
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
-                      r.validation === "error"
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-warning/15 text-warning",
-                    )}
-                  >
-                    {r.validation === "error" ? (
-                      <X className="size-3.5" />
-                    ) : (
-                      <AlertTriangle className="size-3.5" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-foreground">
-                      Fila {r.rowNumber} ·{" "}
-                      <span className="text-muted-foreground">
-                        {r.fullName}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{r.issue}</p>
-                  </div>
-                </li>
-              ))}
+                  {r.validation === "error" ? (
+                    <X className="size-3.5" />
+                  ) : (
+                    <AlertTriangle className="size-3.5" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-foreground">
+                    Fila {r.rowNumber} ·{" "}
+                    <span className="text-muted-foreground">
+                      {r.fullName || r.documentNumber || "(sin datos)"}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">{r.issue}</p>
+                </div>
+              </li>
+            ))}
           </ul>
         </div>
       )}
@@ -685,8 +691,8 @@ function ConfirmStep({
           Resumen de la importación
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Confirma para crear los registros de graduandos. Esta acción se
-          puede revertir desde el log de auditoría.
+          Confirma para crear los registros de graduandos. Los duplicados
+          (mismo documento en la misma ceremonia) se omiten automáticamente.
         </p>
         <Separator className="my-4" />
         <div className="space-y-2 text-sm">
@@ -742,11 +748,13 @@ function Row({ label, value }: { label: string; value: string }) {
 /* ------------------------------------------------------------------ */
 
 function DoneStep({
-  importable,
+  inserted,
+  skipped,
   ceremony,
   onAnother,
 }: {
-  importable: number;
+  inserted: number;
+  skipped: number;
   ceremony: Ceremony | null;
   onAnother: () => void;
 }) {
@@ -761,14 +769,26 @@ function DoneStep({
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Se crearon{" "}
-          <strong className="text-foreground">{importable} graduandos</strong>{" "}
-          en{" "}
-          <span className="text-foreground">{ceremony?.name}</span>.
+          <strong className="text-foreground">{inserted} graduandos</strong> en{" "}
+          <span className="text-foreground">{ceremony?.name}</span>
+          {skipped > 0 ? (
+            <>
+              {" "}
+              · <span className="text-foreground">{skipped} duplicados</span> se
+              omitieron
+            </>
+          ) : null}
+          .
         </p>
       </div>
-      <Button onClick={onAnother} variant="outline" className="mt-2">
-        Importar otro archivo
-      </Button>
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={onAnother}>
+          Importar otro archivo
+        </Button>
+        <Button asChild>
+          <Link href="/admin/graduandos">Ver graduandos</Link>
+        </Button>
+      </div>
     </div>
   );
 }

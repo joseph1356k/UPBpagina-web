@@ -16,8 +16,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BrandMark } from "@/components/shared/brand-mark";
-import { getGraduateByDocument } from "@/lib/data";
 import { DOCUMENT_TYPE_LABEL, ROUTES } from "@/lib/constants";
+import { USE_SUPABASE } from "@/lib/supabase/env";
+import { getGraduateByDocument } from "@/lib/mock";
 import type { DocumentType } from "@/lib/types";
 
 /* ------------------------------------------------------------------ */
@@ -99,25 +100,50 @@ export default function RegistroPage() {
       return;
     }
 
-    // ── Mock API call (async transition) ───────────────────────────
     startTransition(async () => {
       try {
-        const graduate = await getGraduateByDocument({ documentNumber: docNumber });
+        if (USE_SUPABASE) {
+          // Real mode: skip the pre-lookup (we don't have RLS access from
+          // the browser anyway) and call the OTP endpoint directly. It
+          // validates the graduate, generates the code, and emails it.
+          const res = await fetch("/api/auth/graduate/send-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ documentNumber: docNumber }),
+          });
+          const json = await res.json().catch(() => ({}));
 
-        // No match, or document type mismatch (same error to prevent enumeration)
-        if (!graduate || graduate.documentType !== docType) {
-          setAttempts((n) => n + 1);
-          setError("not_found");
-          return;
+          if (!res.ok || json.ok === false) {
+            const err = (json.error ?? "unknown") as string;
+            if (err === "not_found" || err === "not_eligible" || err === "rate_limit") {
+              setError(err);
+            } else {
+              setError("unknown");
+            }
+            setAttempts((n) => n + 1);
+            return;
+          }
+
+          // graduateId comes back so the next page knows who to verify.
+          router.push(`${ROUTES.registroVerificacion}?gid=${json.graduateId}`);
+        } else {
+          // Mock mode: in-memory lookup.
+          const graduate = await getGraduateByDocument({ documentNumber: docNumber });
+
+          if (!graduate || graduate.documentType !== docType) {
+            setAttempts((n) => n + 1);
+            setError("not_found");
+            return;
+          }
+
+          if (graduate.status === "not_eligible") {
+            setError("not_eligible");
+            return;
+          }
+
+          router.push(`${ROUTES.registroVerificacion}?gid=${graduate.id}`);
         }
-
-        if (graduate.status === "not_eligible") {
-          setError("not_eligible");
-          return;
-        }
-
-        // ✓ Valid graduate → proceed to OTP verification
-        router.push(`${ROUTES.registroVerificacion}?gid=${graduate.id}`);
       } catch {
         setError("unknown");
       }
