@@ -1,19 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { LogOut } from "lucide-react";
+import { toast } from "sonner";
 
 import { BrandMark } from "@/components/shared/brand-mark";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { formatInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { ADMIN_NAV, type AdminNavItem } from "./nav-items";
+
+export interface AdminSidebarUser {
+  fullName: string;
+  role: string;
+  campus?: string;
+}
 
 interface AdminSidebarProps {
   className?: string;
   onNavigate?: () => void;
+  user?: AdminSidebarUser | null;
 }
 
-export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
+export function AdminSidebar({ className, onNavigate, user }: AdminSidebarProps) {
   return (
     <aside
       className={cn(
@@ -46,7 +58,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
       </nav>
 
       <Separator className="bg-sidebar-border" />
-      <UserChip />
+      <UserChip user={user} />
     </aside>
   );
 }
@@ -95,23 +107,63 @@ function NavLink({
   );
 }
 
-function UserChip() {
+const ROLE_LABEL: Record<string, string> = {
+  admin: "Administrador",
+  coordinator: "Coordinador",
+  scanner: "Operador de escáner",
+};
+
+function UserChip({ user }: { user?: AdminSidebarUser | null }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const fullName = user?.fullName ?? "Usuario";
+  const roleLabel = user ? (ROLE_LABEL[user.role] ?? user.role) : "Cargando…";
+  const subtitle = user?.campus ? `${roleLabel} · ${user.campus}` : roleLabel;
+  const initials = formatInitials(fullName);
+
+  function handleSignOut() {
+    startTransition(async () => {
+      try {
+        const res = await fetch("/api/auth/staff/sign-out", {
+          method: "POST",
+          credentials: "same-origin",
+        });
+        if (!res.ok) throw new Error("signout_failed");
+        // Hard navigate so cookies are re-read on the next request
+        router.replace("/admin/iniciar-sesion");
+        router.refresh();
+      } catch {
+        toast.error("No se pudo cerrar sesión. Intenta de nuevo.");
+      }
+    });
+  }
+
   return (
     <div className="flex items-center gap-3 px-5 py-4">
       <div
         aria-hidden
         className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary text-xs font-semibold ring-1 ring-primary/15"
       >
-        MG
+        {initials}
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">
-          María González
+          {fullName}
         </p>
-        <p className="truncate text-xs text-muted-foreground">
-          Administrador · UPB Medellín
-        </p>
+        <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
       </div>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Cerrar sesión"
+        title="Cerrar sesión"
+        onClick={handleSignOut}
+        disabled={isPending}
+        className="shrink-0 text-muted-foreground hover:text-foreground"
+      >
+        <LogOut className="size-4" />
+      </Button>
     </div>
   );
 }

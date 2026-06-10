@@ -3,7 +3,10 @@
 import { Bell, Menu, Search } from "lucide-react";
 import { useState } from "react";
 
-import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import {
+  AdminSidebar,
+  type AdminSidebarUser,
+} from "@/components/admin/admin-sidebar";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -11,9 +14,10 @@ import { cn } from "@/lib/utils";
 
 interface AdminTopbarProps {
   className?: string;
+  user?: AdminSidebarUser | null;
 }
 
-export function AdminTopbar({ className }: AdminTopbarProps) {
+export function AdminTopbar({ className, user }: AdminTopbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -38,7 +42,7 @@ export function AdminTopbar({ className }: AdminTopbarProps) {
         </SheetTrigger>
         <SheetContent side="left" className="w-72 p-0">
           <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
-          <AdminSidebar onNavigate={() => setMobileOpen(false)} />
+          <AdminSidebar onNavigate={() => setMobileOpen(false)} user={user} />
         </SheetContent>
       </Sheet>
 
