@@ -86,7 +86,16 @@ export function StaffLoginForm({ redirectTo }: Props) {
           // ignore — not critical
         }
 
-        router.push(redirectTo);
+        // Send the user where their role can actually go. A scanner cannot
+        // see /admin/* (the proxy gates it), so the default "/admin" redirect
+        // would bounce them straight back to this login. Route scanners to
+        // /scanner unless they explicitly requested a /scanner/* path.
+        const destination =
+          profile.role === "scanner" && !redirectTo.startsWith("/scanner")
+            ? "/scanner"
+            : redirectTo;
+
+        router.push(destination);
         router.refresh();
       } catch (err) {
         setError(
