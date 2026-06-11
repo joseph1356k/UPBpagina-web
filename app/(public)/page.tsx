@@ -5,11 +5,8 @@ import {
   CheckCircle2,
   FileCheck2,
   KeyRound,
-  Mail,
   QrCode,
-  ScanLine,
   ShieldCheck,
-  Sparkles,
   Users,
 } from "lucide-react";
 
@@ -52,10 +49,17 @@ function Hero() {
       <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pt-20 pb-20 md:px-8 md:pt-28 md:pb-24 lg:grid-cols-[1.5fr_1fr]">
         {/* Copy */}
         <div>
-          <p className="animate-in-up mb-6 inline-flex items-center gap-2 rounded-full border border-brand-gold/30 bg-background/70 px-3 py-1 text-[0.7rem] font-medium uppercase tracking-[0.2em] text-primary backdrop-blur">
-            <Sparkles className="size-3.5 text-brand-gold" />
-            Universidad Pontificia Bolivariana · Plataforma de grados
-          </p>
+          <div className="animate-in-up mb-7 flex items-center gap-3">
+            <UpbShield className="size-9 shrink-0" />
+            <p className="border-l border-border pl-3 leading-snug">
+              <span className="block font-serif text-sm font-semibold text-foreground">
+                Universidad Pontificia Bolivariana
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Plataforma de ceremonias de grado
+              </span>
+            </p>
+          </div>
           <h1 className="animate-in-up stagger-1 max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.05] tracking-tight md:text-[3.4rem] lg:text-[3.6rem]">
             Registro de invitados a ceremonias de grado,{" "}
             <span className="relative whitespace-nowrap">
@@ -153,25 +157,21 @@ function TrustStrip() {
 function HowItWorks() {
   const steps = [
     {
-      icon: KeyRound,
       title: "Verifica tu identidad",
       description:
         "Ingresa tu documento. Recibirás un código de un solo uso en tu correo institucional para confirmar que eres tú.",
     },
     {
-      icon: Users,
       title: "Registra a tus invitados",
       description:
         "Agrega el nombre y correo de cada invitado, hasta el cupo asignado para tu ceremonia y programa.",
     },
     {
-      icon: Mail,
       title: "Cada invitado recibe su pase",
       description:
-        "Enviamos una invitación digital por correo con un QR único, firmado y no transferible.",
+        "Enviamos una invitación digital por correo con un QR único e intransferible.",
     },
     {
-      icon: ScanLine,
       title: "Pasan en segundos",
       description:
         "El día de la ceremonia el personal de UPB escanea el QR. Sin colas, sin papeles, sin confusión.",
@@ -192,35 +192,38 @@ function HowItWorks() {
             puedes usar el correo, puedes usar la plataforma.
           </p>
         </div>
-        <ol className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+
+        {/* Stepper — connected timeline, editorial style */}
+        <ol className="relative flex flex-col gap-10 md:grid md:grid-cols-4 md:gap-8">
+          {/* Vertical connector (mobile) */}
+          <span
+            aria-hidden
+            className="absolute left-[17px] top-2 bottom-2 w-px bg-border md:hidden"
+          />
+          {/* Horizontal connector (desktop) */}
+          <span
+            aria-hidden
+            className="absolute left-[12.5%] right-[12.5%] top-[17px] hidden h-px bg-border md:block"
+          />
           {steps.map((step, i) => (
-            <li key={step.title}>
-              <Card className="card-lift h-full ring-foreground/8">
-                <div className="flex flex-col gap-4 px-5 py-6">
-                  <div className="flex items-center justify-between">
-                    <span
-                      aria-hidden
-                      className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15"
-                    >
-                      <step.icon className="size-5" />
-                    </span>
-                    <span
-                      aria-hidden
-                      className="font-serif text-2xl font-semibold tabular-nums text-muted-foreground/40"
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <h3 className="font-serif text-lg font-semibold tracking-tight">
-                      {step.title}
-                    </h3>
-                    <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
-                      {step.description}
-                    </p>
-                  </div>
-                </div>
-              </Card>
+            <li
+              key={step.title}
+              className="relative flex gap-5 md:flex-col md:gap-4 md:text-center"
+            >
+              <span
+                aria-hidden
+                className="relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full bg-primary font-serif text-base font-semibold text-primary-foreground shadow-sm ring-4 ring-background md:mx-auto"
+              >
+                {i + 1}
+              </span>
+              <div className="pt-1 md:pt-0">
+                <h3 className="font-serif text-lg font-semibold tracking-tight">
+                  {step.title}
+                </h3>
+                <p className="mt-1.5 text-pretty text-sm leading-relaxed text-muted-foreground">
+                  {step.description}
+                </p>
+              </div>
             </li>
           ))}
         </ol>
@@ -365,7 +368,7 @@ function Security() {
           Seguridad institucional
         </p>
         <h2 className="mx-auto max-w-2xl text-balance font-serif text-3xl font-semibold tracking-tight md:text-[2.4rem]">
-          Cada QR firmado, cada acción registrada.
+          Cada pase es único, cada acción queda registrada.
         </h2>
         <p className="mx-auto mt-5 max-w-2xl text-pretty text-muted-foreground">
           La plataforma fue diseñada bajo los lineamientos de protección de
@@ -375,14 +378,9 @@ function Security() {
         <div className="mt-12 grid gap-4 text-left md:grid-cols-3">
           {points.map((p) => (
             <Card key={p.title} className="card-lift ring-foreground/8">
-              <div className="flex flex-col gap-3 px-5 py-6">
-                <span
-                  aria-hidden
-                  className="inline-flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15"
-                >
-                  <p.icon className="size-5" />
-                </span>
-                <h3 className="font-serif text-base font-semibold">
+              <div className="flex flex-col gap-2.5 px-5 py-6">
+                <h3 className="flex items-center gap-2 font-serif text-base font-semibold">
+                  <p.icon aria-hidden className="size-4.5 shrink-0 text-primary" />
                   {p.title}
                 </h3>
                 <p className="text-sm leading-relaxed text-muted-foreground">

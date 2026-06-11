@@ -123,6 +123,10 @@ La intención de diseño:
 - Los `types.ts` ya reflejan el schema futuro (tablas `ceremonies`, `graduates`, `guests`, `users`, `scan_events`, `audit_log`).
 - Row Level Security se configurará para que cada graduando solo vea sus propios invitados, scanners solo lo necesario para validar, admins todo.
 
+## Créditos
+
+- Escudo UPB vectorizado: [Wikimedia Commons — "Escudo UPB.svg"](https://commons.wikimedia.org/wiki/File:Escudo_UPB.svg), licencia CC BY 4.0. Inlined en `components/shared/upb-shield.tsx` y `public/escudo-upb.svg`.
+
 ## Notas
 
 - Si se prefiere mover el proyecto al raíz del workspace, hay que renombrarlo en `package.json` (npm rechaza nombres con espacios y mayúsculas — por eso vive en `web/`).
