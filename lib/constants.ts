@@ -174,4 +174,6 @@ export const PRODUCT = {
     "Plataforma institucional de la Universidad Pontificia Bolivariana para el registro y validación de invitados en ceremonias de grado.",
   institution: "Universidad Pontificia Bolivariana",
   institutionShort: "UPB",
+  /** Official UPB portal (Medellín / sede principal). */
+  officialPortalUrl: "https://www.upb.edu.co",
 } as const;

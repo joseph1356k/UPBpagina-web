@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 
 import { BrandMark } from "@/components/shared/brand-mark";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
@@ -34,6 +35,13 @@ export function PublicHeader() {
               {link.label}
             </Link>
           ))}
+          <Link
+            href="/upb-medellin"
+            className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            UPB Medellín
+            <ExternalLink className="size-3.5 opacity-70" />
+          </Link>
         </nav>
         <div className="ml-auto flex items-center gap-1.5">
           <ThemeToggle />
