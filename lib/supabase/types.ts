@@ -51,6 +51,8 @@ export interface Database {
         Row: {
           id: string;
           name: string;
+          event_type: string;
+          email_template: string;
           date: string;
           start_time: string;
           end_time: string;
@@ -66,6 +68,8 @@ export interface Database {
         Insert: {
           id?: string;
           name: string;
+          event_type?: string;
+          email_template?: string;
           date: string;
           start_time: string;
           end_time: string;
@@ -81,6 +85,8 @@ export interface Database {
         Update: {
           id?: string;
           name?: string;
+          event_type?: string;
+          email_template?: string;
           date?: string;
           start_time?: string;
           end_time?: string;
@@ -136,6 +142,7 @@ export interface Database {
           max_guests: number;
           status: GraduateStatusDb;
           notified_at: Timestamp | null;
+          photo_url: string | null;
           created_at: Timestamp;
           updated_at: Timestamp;
         };
@@ -152,6 +159,7 @@ export interface Database {
           max_guests?: number;
           status?: GraduateStatusDb;
           notified_at?: Timestamp | null;
+          photo_url?: string | null;
           created_at?: Timestamp;
           updated_at?: Timestamp;
         };
@@ -166,6 +174,7 @@ export interface Database {
           max_guests?: number;
           status?: GraduateStatusDb;
           notified_at?: Timestamp | null;
+          photo_url?: string | null;
           updated_at?: Timestamp;
         };
         Relationships: [

@@ -51,9 +51,18 @@ export type EntityType =
   | "user"
   | "scan_event";
 
+/**
+ * An event. The physical table is still named `ceremonies` (legacy from the
+ * graduation-only era); `eventType` + lib/terminology drive the user-facing
+ * vocabulary per kind of event.
+ */
 export interface Ceremony {
   id: string;
   name: string;
+  /** Event kind — see lib/terminology EVENT_TYPES. */
+  eventType: string;
+  /** Invitation email template key — see lib/email-templates. */
+  emailTemplate: string;
   date: string; // ISO date (YYYY-MM-DD)
   startTime: string; // HH:mm
   endTime: string; // HH:mm
@@ -67,6 +76,7 @@ export interface Ceremony {
   updatedAt: string;
 }
 
+/** A participant (the person who registers guests). Table: `graduates`. */
 export interface Graduate {
   id: string;
   ceremonyId: string;
@@ -79,6 +89,8 @@ export interface Graduate {
   faculty: string;
   maxGuests: number;
   status: GraduateStatus;
+  /** Optional photo shown in invitation emails (public Storage URL). */
+  photoUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

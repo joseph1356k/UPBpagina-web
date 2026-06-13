@@ -53,7 +53,7 @@ export default async function AdminDashboardPage() {
       <PageHeader
         eyebrow="Panel administrador"
         title="Resumen general"
-        description="Estado actual de las ceremonias, registros y validaciones de ingreso."
+        description="Estado actual de tus eventos, registros y validaciones de ingreso."
         actions={
           <>
             <Button variant="outline" size="sm" asChild>
@@ -64,7 +64,7 @@ export default async function AdminDashboardPage() {
             </Button>
             <Button size="sm" asChild>
               <Link href={ROUTES.adminCeremonias}>
-                Nueva ceremonia
+                Nuevo evento
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -77,14 +77,14 @@ export default async function AdminDashboardPage() {
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
         <StatCard
-          label="Ceremonias activas"
+          label="Eventos activos"
           value={stats.activeCeremonies}
           hint={`${stats.totalCeremonies} en el historial`}
           icon={CalendarCheck}
           accent="info"
         />
         <StatCard
-          label="Graduandos registrados"
+          label="Participantes registrados"
           value={`${formatNumber(stats.graduatesRegistered)}/${formatNumber(stats.totalGraduates)}`}
           hint={`${Math.round((stats.graduatesRegistered / Math.max(stats.totalGraduates, 1)) * 100)}% de la base`}
           icon={Users}
@@ -115,7 +115,7 @@ export default async function AdminDashboardPage() {
         ) : (
           <Card>
             <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              No hay ceremonias próximas.
+              No hay eventos próximos.
             </CardContent>
           </Card>
         )}
@@ -253,7 +253,7 @@ function NextCeremonyCard({ ceremony, stats }: NextCeremonyCardProps) {
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[0.72rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Próxima ceremonia
+              Próximo evento
             </p>
             <CeremonyStatusBadge status={ceremony.status} showDot />
           </div>
@@ -279,7 +279,7 @@ function NextCeremonyCard({ ceremony, stats }: NextCeremonyCardProps) {
 
         <div className="grid gap-5 sm:grid-cols-2">
           <ProgressItem
-            label="Graduandos registrados"
+            label="Participantes registrados"
             value={stats.graduatesRegistered}
             total={stats.graduatesCount}
             percent={registrationPct}
@@ -360,13 +360,13 @@ function ProgressItem({
 function QuickActions() {
   const actions = [
     {
-      label: "Importar graduandos",
+      label: "Importar participantes",
       hint: "Excel o CSV con preview",
       href: ROUTES.adminImportar,
       icon: Upload,
     },
     {
-      label: "Ver graduandos",
+      label: "Ver participantes",
       hint: "Búsqueda y filtros",
       href: ROUTES.adminGraduandos,
       icon: Users,

@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/sheet";
 import { adminApi } from "@/lib/api-client";
 import type { CreateCeremonyInput } from "@/lib/data";
+import { EMAIL_TEMPLATES } from "@/lib/email-templates";
+import { EVENT_TYPES, getTerminology } from "@/lib/terminology";
 import type { Ceremony, CeremonyStatus } from "@/lib/types";
 
 /* ------------------------------------------------------------------ */
@@ -32,6 +34,8 @@ import type { Ceremony, CeremonyStatus } from "@/lib/types";
 
 type Fields = {
   name: string;
+  eventType: string;
+  emailTemplate: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -140,6 +144,9 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
 
   const [fields, setFields] = useState<Fields>({
     name: ceremony?.name ?? "",
+    eventType: ceremony?.eventType ?? "graduation",
+    emailTemplate:
+      ceremony?.emailTemplate ?? getTerminology("graduation").defaultTemplate,
     date: ceremony?.date ?? "",
     startTime: ceremony?.startTime ?? "",
     endTime: ceremony?.endTime ?? "",
@@ -158,6 +165,22 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
   }
 
+  /** Changing the event type suggests its default template (only when the
+   *  admin hasn't deliberately diverged — i.e. current value is still the
+   *  previous type's default). */
+  function setEventType(next: string) {
+    setFields((prev) => {
+      const prevDefault = getTerminology(prev.eventType).defaultTemplate;
+      const nextDefault = getTerminology(next).defaultTemplate;
+      return {
+        ...prev,
+        eventType: next,
+        emailTemplate:
+          prev.emailTemplate === prevDefault ? nextDefault : prev.emailTemplate,
+      };
+    });
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setServerError(null);
@@ -169,6 +192,8 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
       try {
         const input: CreateCeremonyInput = {
           name: fields.name.trim(),
+          eventType: fields.eventType,
+          emailTemplate: fields.emailTemplate,
           date: fields.date,
           startTime: fields.startTime,
           endTime: fields.endTime,
@@ -226,8 +251,31 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
         className="flex flex-1 flex-col overflow-hidden"
       >
         <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
+          {/* Event type */}
+          <Field
+            label="Tipo de evento"
+            required
+            hint="Define el lenguaje de la plataforma y la plantilla sugerida."
+          >
+            <Select
+              value={fields.eventType}
+              onValueChange={(v) => setEventType(String(v ?? "graduation"))}
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EVENT_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
           {/* Name */}
-          <Field label="Nombre de la ceremonia" required error={errors.name}>
+          <Field label="Nombre del evento" required error={errors.name}>
             <Input
               value={fields.name}
               onChange={(e) => set("name", e.target.value)}
@@ -356,6 +404,31 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
               />
             </Field>
           </div>
+
+          {/* Email template */}
+          <Field
+            label="Plantilla del correo de invitación"
+            hint={
+              EMAIL_TEMPLATES.find((t) => t.key === fields.emailTemplate)
+                ?.description
+            }
+          >
+            <Select
+              value={fields.emailTemplate}
+              onValueChange={(v) => set("emailTemplate", String(v ?? "clasica"))}
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EMAIL_TEMPLATES.map((t) => (
+                  <SelectItem key={t.key} value={t.key}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
           {/* Registration closes */}
           <Field

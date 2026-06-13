@@ -16,11 +16,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { GuestForm } from "@/components/graduate/guest-form";
 import { GuestStatusBadge } from "@/components/shared/status-badge";
+import { PhotoCard } from "@/components/graduate/photo-card";
 import { QuotaCard } from "@/components/graduate/quota-card";
 import { SendInvitationsDialog } from "@/components/graduate/send-invitations-dialog";
 import { useGraduatePortal } from "@/components/graduate/auth-provider";
 import { ROUTES } from "@/lib/constants";
 import { formatDateLong, formatInitials, formatTime } from "@/lib/format";
+import { getTerminology } from "@/lib/terminology";
 import { cn } from "@/lib/utils";
 
 const RECENT_PREVIEW_COUNT = 4;
@@ -28,6 +30,7 @@ const RECENT_PREVIEW_COUNT = 4;
 export default function PortalDashboard() {
   const { graduate, ceremony, guests, isFull, quotaUsed, quotaTotal } =
     useGraduatePortal();
+  const terms = getTerminology(ceremony.eventType);
 
   const [guestFormOpen, setGuestFormOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
@@ -62,7 +65,9 @@ export default function PortalDashboard() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Tu ceremonia de grado
+                {ceremony.eventType === "graduation"
+                  ? "Tu ceremonia de grado"
+                  : `Tu ${terms.eventNoun} · ${terms.label}`}
               </p>
               <h2 className="mt-0.5 font-semibold text-foreground">
                 {ceremony.name}
@@ -80,6 +85,13 @@ export default function PortalDashboard() {
             </div>
           </div>
         </div>
+
+        {/* ── Participant photo (only where it adds value) ─────────── */}
+        {terms.photoRecommended && (
+          <div className="md:col-span-2">
+            <PhotoCard />
+          </div>
+        )}
 
         {/* ── Quota card ──────────────────────────────────────────── */}
         <QuotaCard />

@@ -18,10 +18,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { USE_SUPABASE } from "@/lib/supabase/env";
 import {
-  invitationEmailTemplate,
   invitationsSentConfirmationTemplate,
   sendEmail,
 } from "@/lib/email";
+import { renderInvitation } from "@/lib/email-templates";
+import { getTerminology } from "@/lib/terminology";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { assertSameOrigin } from "@/lib/security/csrf";
 import { parseJson, SendInvitationsBody } from "@/lib/security/schemas";
@@ -105,7 +106,9 @@ export async function POST(request: NextRequest) {
 
   const { data: grad } = await service
     .from("graduates")
-    .select("full_name, ceremony_id, ceremonies(name, date, start_time, venue, campus)")
+    .select(
+      "full_name, photo_url, ceremony_id, ceremonies(name, event_type, email_template, date, start_time, venue, campus)",
+    )
     .eq("id", graduateId)
     .single();
   if (!grad || !grad.ceremonies) {
@@ -113,11 +116,14 @@ export async function POST(request: NextRequest) {
   }
   const cer = grad.ceremonies as unknown as {
     name: string;
+    event_type: string;
+    email_template: string;
     date: string;
     start_time: string;
     venue: string;
     campus: string;
   };
+  const terms = getTerminology(cer.event_type);
 
   // ── Send emails ───────────────────────────────────────────────────
   let sent = 0;
@@ -129,14 +135,18 @@ export async function POST(request: NextRequest) {
       skipped++;
       continue;
     }
-    const tpl = invitationEmailTemplate({
+    const tpl = renderInvitation(cer.email_template, {
       guestFirstName: g.full_name.split(" ")[0] ?? g.full_name,
-      graduateFullName: grad.full_name,
-      ceremonyName: cer.name,
-      ceremonyDate: formatDateLong(cer.date),
-      ceremonyTime: formatTime(cer.start_time),
-      ceremonyVenue: `${cer.venue}, ${cer.campus}`,
+      participantName: grad.full_name,
+      participantPhotoUrl: grad.photo_url ?? null,
+      invitePhrase: terms.invitePhrase,
+      eventName: cer.name,
+      eventTypeLabel: terms.label,
+      dateLong: formatDateLong(cer.date),
+      time: formatTime(cer.start_time),
+      venue: `${cer.venue}, ${cer.campus}`,
       invitationUrl: `${BASE_URL}/invitacion/${g.invitation_token}`,
+      supportEmail: "soporte.ceremonias@upb.edu.co",
     });
     try {
       await sendEmail({ to: g.email, ...tpl });

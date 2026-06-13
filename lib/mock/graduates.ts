@@ -105,6 +105,7 @@ function generate(): Graduate[] {
         faculty: spec.facultyName,
         maxGuests: spec.maxGuests,
         status,
+        photoUrl: null,
         createdAt: spec.baseDate,
         updatedAt: spec.baseDate,
       };

@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { getCeremonies } from "@/lib/data";
 
 export const metadata = {
-  title: "Ceremonias — Panel administrador",
+  title: "Eventos — Panel administrador",
 };
 
 export default async function CeremoniesPage() {
@@ -13,8 +13,8 @@ export default async function CeremoniesPage() {
     <div className="flex flex-col gap-8">
       <PageHeader
         eyebrow="Panel administrador"
-        title="Ceremonias"
-        description="Gestiona las ceremonias de grado: crea, edita y controla el estado de cada evento."
+        title="Eventos"
+        description="Crea, configura y opera eventos de cualquier tipo: grados, conferencias, eventos institucionales, deportivos y más."
       />
 
       <CeremoniesTable initialCeremonies={ceremonies} />

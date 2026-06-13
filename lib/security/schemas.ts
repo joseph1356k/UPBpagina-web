@@ -56,8 +56,13 @@ export type SendInvitationsInput = z.infer<typeof SendInvitationsBody>;
    Admin mutations — ceremonies
    ──────────────────────────────────────────────────────────────────── */
 
+import { EVENT_TYPE_VALUES } from "@/lib/terminology";
+import { EMAIL_TEMPLATE_KEYS } from "@/lib/email-templates";
+
 const CeremonyBase = {
   name: z.string().trim().min(3).max(120),
+  eventType: z.enum(EVENT_TYPE_VALUES),
+  emailTemplate: z.enum(EMAIL_TEMPLATE_KEYS),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "fecha YYYY-MM-DD"),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, "hora HH:MM"),
   endTime: z.string().regex(/^\d{2}:\d{2}$/, "hora HH:MM"),

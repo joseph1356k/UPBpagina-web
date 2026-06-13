@@ -369,6 +369,8 @@ export async function createCeremony(
     .from("ceremonies")
     .insert({
       name: data.name,
+      event_type: data.eventType,
+      email_template: data.emailTemplate,
       date: data.date,
       start_time: data.startTime,
       end_time: data.endTime,
@@ -394,6 +396,9 @@ export async function updateCeremony(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const update: any = {};
   if (patch.name !== undefined) update.name = patch.name;
+  if (patch.eventType !== undefined) update.event_type = patch.eventType;
+  if (patch.emailTemplate !== undefined)
+    update.email_template = patch.emailTemplate;
   if (patch.date !== undefined) update.date = patch.date;
   if (patch.startTime !== undefined) update.start_time = patch.startTime;
   if (patch.endTime !== undefined) update.end_time = patch.endTime;

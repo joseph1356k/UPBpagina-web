@@ -35,7 +35,7 @@ export function QuotaCard({ className, compact = false }: QuotaCardProps) {
             </h3>
             {!compact && (
               <p className="text-xs text-muted-foreground">
-                Tope asignado por la Universidad para esta ceremonia.
+                Tope asignado por la organización para este evento.
               </p>
             )}
           </div>

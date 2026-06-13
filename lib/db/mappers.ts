@@ -21,6 +21,8 @@ export function ceremonyFromRow(row: Tables["ceremonies"]["Row"]): Ceremony {
   return {
     id: row.id,
     name: row.name,
+    eventType: row.event_type,
+    emailTemplate: row.email_template,
     date: row.date,
     startTime: row.start_time,
     endTime: row.end_time,
@@ -48,6 +50,7 @@ export function graduateFromRow(row: Tables["graduates"]["Row"]): Graduate {
     faculty: row.faculty,
     maxGuests: row.max_guests,
     status: row.status,
+    photoUrl: row.photo_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

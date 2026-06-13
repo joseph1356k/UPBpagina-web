@@ -31,6 +31,7 @@ import {
   ROUTES,
 } from "@/lib/constants";
 import { formatDateShort, formatTime } from "@/lib/format";
+import { EVENT_TYPES, getTerminology } from "@/lib/terminology";
 import type { Ceremony, CeremonyStatus } from "@/lib/types";
 
 const PAGE_SIZE = 10;
@@ -51,6 +52,7 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
   const [ceremonies, setCeremonies] = useState(initialCeremonies);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Ceremony | null>(null);
@@ -58,6 +60,7 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
   const filtered = useMemo(() => {
     let result = ceremonies;
     if (statusFilter) result = result.filter((c) => c.status === statusFilter);
+    if (typeFilter) result = result.filter((c) => c.eventType === typeFilter);
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(
@@ -69,7 +72,7 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
       );
     }
     return result;
-  }, [ceremonies, search, statusFilter]);
+  }, [ceremonies, search, statusFilter, typeFilter]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const safePage = Math.min(page, Math.max(1, totalPages));
@@ -103,9 +106,9 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
       setCeremonies((prev) =>
         prev.map((x) => (x.id === updated.id ? updated : x)),
       );
-      toast.success("Ceremonia archivada");
+      toast.success("Evento archivado");
     } catch {
-      toast.error("No se pudo archivar la ceremonia.");
+      toast.error("No se pudo archivar el evento.");
     }
   }
 
@@ -115,20 +118,28 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
         <TableToolbar
           searchValue={search}
           onSearchChange={(v) => { setSearch(v); setPage(1); }}
-          searchPlaceholder="Buscar por nombre, sede o facultad…"
+          searchPlaceholder="Buscar por nombre, sede o lugar…"
           filters={[
+            {
+              id: "type",
+              value: typeFilter,
+              placeholder: "Todos los tipos",
+              options: EVENT_TYPES.map((t) => ({ value: t.value, label: t.label })),
+              onValueChange: (v) => { setTypeFilter(v); setPage(1); },
+              className: "w-52",
+            },
             {
               id: "status",
               value: statusFilter,
               placeholder: "Todos los estados",
               options: STATUS_FILTER_OPTIONS,
               onValueChange: (v) => { setStatusFilter(v); setPage(1); },
-              className: "w-48",
+              className: "w-44",
             },
           ]}
           filteredCount={filtered.length}
           totalCount={ceremonies.length}
-          entityLabel="ceremonias"
+          entityLabel="eventos"
           className="flex-1"
         />
         <Button onClick={openCreate} size="sm" className="shrink-0">
@@ -141,7 +152,8 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-4">Ceremonia</TableHead>
+              <TableHead className="pl-4">Evento</TableHead>
+              <TableHead className="hidden sm:table-cell">Tipo</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead className="hidden md:table-cell">Campus</TableHead>
               <TableHead className="hidden lg:table-cell">Estado</TableHead>
@@ -152,15 +164,15 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
             {paginated.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={5}
+                  colSpan={6}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
                   <div className="flex flex-col items-center gap-2">
                     <CalendarDays className="size-8 text-muted-foreground/40" />
                     <p>
-                      {search || statusFilter
-                        ? "No hay ceremonias con esos filtros."
-                        : "No hay ceremonias registradas."}
+                      {search || statusFilter || typeFilter
+                        ? "No hay eventos con esos filtros."
+                        : "No hay eventos registrados."}
                     </p>
                   </div>
                 </TableCell>
@@ -175,12 +187,17 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
                     >
                       {c.name}
                     </Link>
-                    <p className="text-xs text-muted-foreground mt-0.5 md:hidden">
-                      {c.campus}
+                    <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">
+                      {getTerminology(c.eventType).label}
                     </p>
                     <p className="text-xs text-muted-foreground lg:hidden mt-0.5">
                       <CeremonyStatusBadge status={c.status} className="lg:hidden" />
                     </p>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      {getTerminology(c.eventType).label}
+                    </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     <p className="text-sm">{formatDateShort(c.date)}</p>

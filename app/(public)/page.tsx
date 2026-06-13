@@ -2,21 +2,35 @@ import Link from "next/link";
 import {
   ArrowRight,
   Ban,
+  BookOpen,
+  Briefcase,
   CalendarClock,
   CalendarDays,
+  CalendarRange,
   CheckCircle2,
   Clock,
   FileQuestion,
+  GraduationCap,
+  Handshake,
   KeyRound,
+  Landmark,
+  type LucideIcon,
   Mail,
   MapPin,
+  Mic,
+  PartyPopper,
   PencilLine,
+  Presentation,
   QrCode as QrCodeIcon,
   ScanLine,
   Send,
   ShieldCheck,
+  Store,
   TimerOff,
+  Trophy,
   UserX,
+  UtensilsCrossed,
+  Wrench,
   XCircle,
 } from "lucide-react";
 
@@ -25,6 +39,7 @@ import { UpbShield } from "@/components/shared/upb-shield";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ROUTES } from "@/lib/constants";
+import { EVENT_TYPES } from "@/lib/terminology";
 import { cn } from "@/lib/utils";
 
 export default function LandingPage() {
@@ -32,11 +47,12 @@ export default function LandingPage() {
     <>
       <Hero />
       <TrustStrip />
+      <EventTypes />
       <HowItWorks />
-      <ForGraduates />
-      <KeyDates />
       <DigitalPass />
       <EventDay />
+      <ForGraduates />
+      <KeyDates />
       <RealCases />
       <ForAdmins />
       <Security />
@@ -74,12 +90,12 @@ function Hero() {
                 Universidad Pontificia Bolivariana
               </span>
               <span className="block text-xs text-muted-foreground">
-                Plataforma de ceremonias de grado
+                Plataforma de gestión de eventos
               </span>
             </p>
           </div>
           <h1 className="animate-in-up stagger-1 max-w-3xl text-balance font-serif text-4xl font-semibold leading-[1.05] tracking-tight md:text-[3.4rem] lg:text-[3.6rem]">
-            Registro de invitados a ceremonias de grado,{" "}
+            Gestiona tus eventos, invita{" "}
             <span className="relative whitespace-nowrap">
               <span className="relative z-10 text-primary">sin filas</span>
               <span
@@ -87,12 +103,13 @@ function Hero() {
                 className="gold-shimmer absolute inset-x-0 bottom-1 h-2 -z-0 rounded-sm opacity-50"
               />
             </span>{" "}
-            y con trazabilidad.
+            y controla cada ingreso.
           </h1>
           <p className="animate-in-up stagger-2 mt-7 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-            Una plataforma institucional para que los graduandos registren a sus
-            invitados desde cualquier lugar, reciban invitaciones digitales con
-            QR único, y el día del evento UPB valide cada ingreso en segundos.
+            La plataforma de la UPB para gestionar eventos de cualquier tipo:
+            invitaciones digitales con QR único, registro de participantes y
+            asistentes, y validación de ingreso en segundos. Desde una ceremonia
+            de grado hasta una conferencia o un evento deportivo.
           </p>
           <div className="animate-in-up stagger-3 mt-9 flex flex-col gap-3 sm:flex-row">
             <Button asChild size="lg" className="group">
@@ -142,9 +159,9 @@ function Hero() {
 
 function TrustStrip() {
   const stats = [
-    { label: "Ceremonias por año", value: "12+" },
-    { label: "Graduandos por ceremonia", value: "180" },
-    { label: "Cupos típicos por graduando", value: "3–4" },
+    { label: "Eventos al año", value: "30+" },
+    { label: "Participantes por evento", value: "hasta 1.000" },
+    { label: "Tipos de evento", value: "12+" },
     { label: "Validación de QR", value: "< 2s" },
   ];
   return (
@@ -163,6 +180,61 @@ function TrustStrip() {
             </p>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Event types                                                       */
+/* ------------------------------------------------------------------ */
+
+const EVENT_TYPE_ICONS: Record<string, LucideIcon> = {
+  graduation: GraduationCap,
+  institutional: Landmark,
+  private: PartyPopper,
+  sports: Trophy,
+  catering: UtensilsCrossed,
+  investors: Briefcase,
+  conference: Presentation,
+  talk: Mic,
+  workshop: Wrench,
+  seminar: BookOpen,
+  fair: Store,
+  business: Handshake,
+  other: CalendarRange,
+};
+
+function EventTypes() {
+  return (
+    <section id="tipos" className="py-20 md:py-28">
+      <div className="mx-auto max-w-6xl px-4 md:px-8">
+        <SectionHeading
+          eyebrow="Un sistema, muchos eventos"
+          title="Pensada para cualquier tipo de evento."
+          lede="Cada evento adapta su lenguaje, su plantilla de correo y su experiencia. Eliges el tipo al crearlo y la plataforma se acomoda — sin configuraciones complicadas."
+        />
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {EVENT_TYPES.filter((t) => t.value !== "other").map((t) => {
+            const Icon = EVENT_TYPE_ICONS[t.value] ?? CalendarRange;
+            return (
+              <li
+                key={t.value}
+                className="card-lift flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3.5"
+              >
+                <Icon aria-hidden className="size-5 shrink-0 text-primary" />
+                <span className="text-sm font-medium text-foreground">
+                  {t.label}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-4 text-sm text-muted-foreground">
+          …y más. ¿No encaja en una categoría? Usa el tipo
+          <span className="text-foreground"> «Otro»</span> y configúralo a tu
+          medida.
+        </p>
       </div>
     </section>
   );
@@ -227,7 +299,7 @@ function HowItWorks() {
     {
       title: "Registra a tus invitados",
       description:
-        "Agrega el nombre y correo de cada invitado, hasta el cupo asignado para tu ceremonia y programa.",
+        "Agrega el nombre y correo de cada invitado, hasta el cupo asignado para tu evento.",
     },
     {
       title: "Cada invitado recibe su pase",
@@ -237,7 +309,7 @@ function HowItWorks() {
     {
       title: "Pasan en segundos",
       description:
-        "El día de la ceremonia el personal de UPB escanea el QR. Sin colas, sin papeles, sin confusión.",
+        "El día del evento, el personal autorizado escanea el QR. Sin colas, sin papeles, sin confusión.",
     },
   ];
   return (
@@ -246,7 +318,7 @@ function HowItWorks() {
         <SectionHeading
           eyebrow="Cómo funciona"
           title="Cuatro pasos. Desde el celular. Listo en minutos."
-          lede="Diseñado para que el graduando no necesite una explicación. Si puedes usar el correo, puedes usar la plataforma."
+          lede="Diseñado para que el participante no necesite una explicación. Si puedes usar el correo, puedes usar la plataforma."
         />
 
         {/* Stepper — connected timeline, editorial style */}
@@ -294,9 +366,10 @@ function HowItWorks() {
 
 function ForGraduates() {
   const abilities = [
-    "Ver tu ceremonia asignada: fecha, hora y lugar",
+    "Ver tu evento asignado: fecha, hora y lugar",
     "Consultar cuántos cupos tienes disponibles",
     "Registrar a tus invitados con nombre y correo",
+    "Subir una foto opcional que aparece en la invitación",
     "Editar o reemplazar invitados antes de la fecha límite",
     "Reenviar la invitación si alguien no la recibió",
     "Seguir el estado de cada pase en tiempo real",
@@ -315,7 +388,7 @@ function ForGraduates() {
     {
       label: "Ingreso validado",
       tone: "border-success/40 bg-success/10 text-success",
-      description: "Tu invitado ya entró a la ceremonia.",
+      description: "Tu invitado ya entró al evento.",
     },
   ];
   return (
@@ -325,10 +398,14 @@ function ForGraduates() {
     >
       <div className="mx-auto grid max-w-6xl items-start gap-12 px-4 md:px-8 lg:grid-cols-[1.1fr_1fr]">
         <div>
+          <span className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-brand-gold/40 bg-brand-gold/10 px-3 py-1 text-xs font-medium text-brand-red">
+            <GraduationCap className="size-3.5" />
+            Caso destacado · Ceremonias de grado
+          </span>
           <SectionHeading
-            eyebrow="Para graduandos"
-            title="Tu ceremonia, bajo tu control."
-            lede="Desde tu portal personal gestionas todo el proceso de invitados — sin trámites presenciales ni correos de ida y vuelta."
+            eyebrow="Para participantes"
+            title="Tu evento, bajo tu control."
+            lede="En una ceremonia de grado, el graduando gestiona a sus invitados desde su portal personal — sin trámites presenciales. La misma experiencia aplica a anfitriones, organizadores o expositores en cualquier otro evento."
             className="mb-8 md:mb-8"
           />
           <ul className="grid gap-2.5 sm:grid-cols-2">
@@ -405,7 +482,7 @@ function KeyDates() {
     },
     {
       icon: CalendarDays,
-      label: "Día de la ceremonia",
+      label: "Día del evento",
       value: "19 de junio · 9:00 a.m.",
       detail: "Auditorio Mons. Felipe Estrada Vélez · Medellín.",
     },
@@ -415,8 +492,8 @@ function KeyDates() {
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <SectionHeading
           eyebrow="Fechas importantes"
-          title="Cada ceremonia tiene su calendario."
-          lede="Las fechas se definen por ceremonia y se muestran en tu portal apenas ingresas. Este es un ejemplo del calendario típico."
+          title="Cada evento tiene su calendario."
+          lede="Las fechas se definen por evento y se muestran en tu portal apenas ingresas. Este es un ejemplo del calendario de una ceremonia de grado."
         />
 
         <div className="relative">
@@ -469,17 +546,18 @@ function DigitalPass() {
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 md:px-8 lg:grid-cols-[1fr_1.1fr]">
         <div>
           <SectionHeading
-            eyebrow="La invitación digital"
+            eyebrow="Invitaciones y plantillas"
             title="Un pase personal, directo al correo."
-            lede="Cada invitado recibe un enlace con su pase: los datos de la ceremonia y un código QR único. Sirve desde el celular, en captura de pantalla o impreso."
+            lede="Cada invitado recibe un enlace con su pase: los datos del evento, la foto opcional del participante y un código QR único. El administrador elige entre varias plantillas de correo según el tono del evento."
             className="mb-8 md:mb-8"
           />
           <ul className="grid gap-2.5">
             {[
-              "Llega por correo apenas el graduando envía las invitaciones",
+              "Plantillas de correo prediseñadas: clásica, elegante o moderna",
+              "Reemplaza solo la información dinámica — diseño a prueba de errores",
               "El QR es único por invitado: solo permite un ingreso",
               "Funciona sin conexión: basta mostrar la pantalla",
-              "Si se pierde, el graduando puede reenviarlo desde su portal",
+              "Si se pierde, el participante puede reenviarlo desde su portal",
             ].map((t) => (
               <li key={t} className="flex items-start gap-2.5 text-sm">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -586,7 +664,7 @@ function EventDay() {
       icon: ShieldCheck,
       title: "El sistema decide al instante",
       description:
-        "Válido, ya usado, inválido o de otra ceremonia — la respuesta llega en menos de dos segundos.",
+        "Válido, ya usado, inválido o de otro evento — la respuesta llega en menos de dos segundos.",
     },
     {
       icon: Clock,
@@ -729,7 +807,7 @@ function RealCases() {
         <SectionHeading
           eyebrow="Preparado para casos reales"
           title="Los imprevistos también están contemplados."
-          lede="Una ceremonia tiene cientos de personas y poco margen de error. Cada situación tiene una respuesta clara — para el invitado, el graduando y el personal."
+          lede="Un evento masivo tiene cientos de personas y poco margen de error. Cada situación tiene una respuesta clara — para el invitado, el participante y el personal."
         />
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {cases.map((c) => (
@@ -757,7 +835,7 @@ function RealCases() {
 
 function ForAdmins() {
   const modules = [
-    { name: "Ceremonias", description: "Crea y programa cada evento." },
+    { name: "Eventos", description: "Crea, tipifica y programa." },
     { name: "Graduandos", description: "Importa la base desde Excel." },
     { name: "Invitados", description: "Consulta y revoca pases." },
     { name: "Cupos", description: "Ajusta límites por graduando." },

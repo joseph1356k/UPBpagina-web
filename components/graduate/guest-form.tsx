@@ -189,7 +189,7 @@ function GuestFormContents({ guest, onClose }: InnerProps) {
             <div>
               <p className="font-medium text-warning-foreground">Cupo lleno</p>
               <p className="mt-0.5 text-muted-foreground">
-                Ya alcanzaste el máximo de invitados para esta ceremonia.
+                Ya alcanzaste el máximo de invitados para este evento.
                 Revoca uno existente si necesitas reemplazarlo.
               </p>
             </div>
@@ -247,7 +247,7 @@ function GuestFormContents({ guest, onClose }: InnerProps) {
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  Recomendado: agiliza el ingreso el día de la ceremonia.
+                  Recomendado: agiliza el ingreso el día del evento.
                 </p>
               )}
             </div>

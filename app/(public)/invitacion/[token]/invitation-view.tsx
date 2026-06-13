@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Clock,
   Download,
-  GraduationCap,
   MapPin,
   Share2,
   Sparkles,
@@ -17,9 +16,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { QrCode } from "@/components/shared/qr-code";
+import { UpbShield } from "@/components/shared/upb-shield";
 import { GuestStatusBadge } from "@/components/shared/status-badge";
 import { PRODUCT } from "@/lib/constants";
 import { formatDateLong, formatTime } from "@/lib/format";
+import { cap, getTerminology } from "@/lib/terminology";
 import type { InvitationView as InvitationViewData } from "@/lib/data";
 import { cn } from "@/lib/utils";
 
@@ -28,30 +29,31 @@ interface Props {
   token: string;
 }
 
-const BLOCKED_COPY: Record<
-  NonNullable<InvitationViewData["blocked"]>,
-  { title: string; body: string }
-> = {
-  revoked: {
-    title: "Esta invitación fue revocada",
-    body: "El graduando o la coordinación retiró este pase. Si crees que es un error, contacta directamente al graduando.",
-  },
-  ceremony_completed: {
-    title: "La ceremonia ya terminó",
-    body: "Esta invitación corresponde a una ceremonia que ya se realizó. Gracias por acompañar al graduando.",
-  },
-};
-
 export function InvitationView({ view, token }: Props) {
   const { guest, graduate, ceremony, blocked } = view;
   const [copied, setCopied] = useState(false);
+  const terms = getTerminology(ceremony.eventType);
+
+  const blockedCopy: Record<
+    NonNullable<InvitationViewData["blocked"]>,
+    { title: string; body: string }
+  > = {
+    revoked: {
+      title: "Esta invitación fue revocada",
+      body: `El ${terms.participantSingular} o la organización retiró este pase. Si crees que es un error, contacta directamente al ${terms.participantSingular}.`,
+    },
+    ceremony_completed: {
+      title: `${cap(terms.eventNoun)} finalizado`,
+      body: `Esta invitación corresponde a un evento que ya se realizó. Gracias por acompañar al ${terms.participantSingular}.`,
+    },
+  };
 
   function handleShare() {
     const url = typeof window !== "undefined" ? window.location.href : "";
     if (navigator.share) {
       navigator
         .share({
-          title: `Invitación a la ceremonia de ${graduate.fullName}`,
+          title: `Invitación de ${graduate.fullName}`,
           url,
         })
         .catch(() => {});
@@ -68,36 +70,44 @@ export function InvitationView({ view, token }: Props) {
     <div className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 py-8 md:py-12">
       {/* Brand bar */}
       <div className="flex items-center gap-2.5">
-        <span className="inline-flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-          <GraduationCap className="size-5" />
-        </span>
+        <UpbShield className="size-10 shrink-0" />
         <div>
           <p className="text-[0.68rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
             {PRODUCT.institution}
           </p>
           <p className="font-serif text-sm font-semibold leading-tight text-foreground">
-            Ceremonia de grado
+            {terms.label}
           </p>
         </div>
       </div>
 
       {/* Greeting */}
-      <header>
-        <p className="text-sm text-muted-foreground">
-          Hola{" "}
-          <span className="font-medium text-foreground">
-            {guest.fullName.split(" ")[0]}
-          </span>
-          ,
-        </p>
-        <h1 className="mt-1 font-serif text-2xl font-semibold leading-tight text-foreground md:text-[1.7rem]">
-          {graduate.fullName.split(" ").slice(0, 2).join(" ")} te invita a su
-          ceremonia de grado.
-        </h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Guarda esta invitación — la necesitarás para ingresar el día del
-          evento.
-        </p>
+      <header className="flex items-start gap-4">
+        {/* Optional participant photo */}
+        {graduate.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={graduate.photoUrl}
+            alt={graduate.fullName}
+            className="mt-1 size-14 shrink-0 rounded-full border-2 border-brand-gold/60 object-cover"
+          />
+        ) : null}
+        <div>
+          <p className="text-sm text-muted-foreground">
+            Hola{" "}
+            <span className="font-medium text-foreground">
+              {guest.fullName.split(" ")[0]}
+            </span>
+            ,
+          </p>
+          <h1 className="mt-1 font-serif text-2xl font-semibold leading-tight text-foreground md:text-[1.7rem]">
+            {graduate.fullName.split(" ").slice(0, 2).join(" ")} {terms.invitePhrase}.
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Guarda esta invitación — la necesitarás para ingresar el día del
+            evento.
+          </p>
+        </div>
       </header>
 
       {/* Status banner (when blocked) */}
@@ -118,10 +128,10 @@ export function InvitationView({ view, token }: Props) {
           />
           <div>
             <p className="font-medium text-foreground">
-              {BLOCKED_COPY[blocked].title}
+              {blockedCopy[blocked].title}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {BLOCKED_COPY[blocked].body}
+              {blockedCopy[blocked].body}
             </p>
           </div>
         </div>
@@ -146,7 +156,7 @@ export function InvitationView({ view, token }: Props) {
         </p>
         {guest.relationship && (
           <p className="text-xs text-muted-foreground">
-            Invitado por {graduate.fullName} · {guest.relationship}
+            De {graduate.fullName} · {guest.relationship}
           </p>
         )}
 

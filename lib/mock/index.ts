@@ -460,6 +460,7 @@ export async function bulkCreateGraduates(
           ? row.maxGuests
           : ceremony.maxGuestsDefault,
       status: row.status ?? "eligible",
+      photoUrl: null,
       createdAt: now,
       updatedAt: now,
     });

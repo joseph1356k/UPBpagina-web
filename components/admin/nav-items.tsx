@@ -38,12 +38,12 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         exact: true,
       },
       {
-        label: "Ceremonias",
+        label: "Eventos",
         href: ROUTES.adminCeremonias,
         icon: CalendarDays,
       },
       {
-        label: "Graduandos",
+        label: "Participantes",
         href: ROUTES.adminGraduandos,
         icon: GraduationCap,
       },

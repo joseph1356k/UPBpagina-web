@@ -24,8 +24,8 @@ export default async function GraduandosPage({
     <div className="flex flex-col gap-8">
       <PageHeader
         eyebrow="Panel administrador"
-        title="Graduandos"
-        description="Consulta y gestiona el estado de los graduandos inscritos en cada ceremonia."
+        title="Participantes"
+        description="Consulta y gestiona a las personas inscritas en cada evento — graduandos, anfitriones, organizadores o expositores según el tipo."
       />
 
       <GraduatesTable
