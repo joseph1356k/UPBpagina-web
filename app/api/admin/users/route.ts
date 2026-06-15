@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Tight rate limit — provisioning is rare
-  const rl = rateLimit(request, "admin-users-write", { max: 10, windowMs: 60_000 });
+  const rl = await rateLimit(request, "admin-users-write", { max: 10, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
 
   const csrf = assertSameOrigin(request);

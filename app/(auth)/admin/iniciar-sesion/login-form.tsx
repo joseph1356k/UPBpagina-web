@@ -7,6 +7,7 @@ import { AlertCircle, Eye, EyeOff, Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Turnstile } from "@/components/security/turnstile";
 import { createClient } from "@/lib/supabase/client";
 import { USE_SUPABASE } from "@/lib/supabase/env";
 
@@ -21,6 +22,10 @@ export function StaffLoginForm({ redirectTo }: Props) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Turnstile token ("skip" when disabled). Activates once CAPTCHA is enabled
+  // in the Supabase Auth dashboard with the matching Turnstile secret.
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaNonce, setCaptchaNonce] = useState(0);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -46,11 +51,18 @@ export function StaffLoginForm({ redirectTo }: Props) {
         const { data, error: authErr } = await supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password,
+          // Only forward a real token; "skip" means Turnstile is disabled.
+          options:
+            captchaToken && captchaToken !== "skip"
+              ? { captchaToken }
+              : undefined,
         });
 
         if (authErr) {
           // Avoid leaking "user not found" vs "wrong password"
           setError("Correo o contraseña incorrectos.");
+          setCaptchaToken("");
+          setCaptchaNonce((n) => n + 1); // fresh challenge (single-use token)
           return;
         }
 
@@ -181,7 +193,18 @@ export function StaffLoginForm({ redirectTo }: Props) {
         </div>
       )}
 
-      <Button type="submit" className="w-full" disabled={isPending}>
+      {/* Security check (renders nothing if Turnstile is disabled) */}
+      <Turnstile
+        onToken={setCaptchaToken}
+        action="staff-login"
+        resetKey={captchaNonce}
+      />
+
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={isPending || !captchaToken}
+      >
         {isPending ? (
           <>
             <Loader2 className="size-4 animate-spin" />

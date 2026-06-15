@@ -19,6 +19,9 @@ export const SendOtpBody = z.object({
     .refine((s) => s.length >= 6 && s.length <= 12, {
       message: "documento entre 6 y 12 dígitos",
     }),
+  // Cloudflare Turnstile token. Optional in the schema so the endpoint still
+  // works when Turnstile is disabled; the route verifies it server-side.
+  captchaToken: z.string().max(2048).optional(),
 });
 export type SendOtpInput = z.infer<typeof SendOtpBody>;
 

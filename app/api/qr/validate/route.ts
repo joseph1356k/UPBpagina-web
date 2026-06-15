@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. IP rate limit
-  const rl = rateLimit(request, "qr-validate", { max: 60, windowMs: 60_000 });
+  const rl = await rateLimit(request, "qr-validate", { max: 60, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
 
   // 2. CSRF

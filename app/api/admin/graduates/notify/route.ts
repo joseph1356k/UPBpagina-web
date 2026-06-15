@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Mass-mail trigger — keep the window tight
-  const rl = rateLimit(request, "admin-graduates-notify", {
+  const rl = await rateLimit(request, "admin-graduates-notify", {
     max: 3,
     windowMs: 60_000,
   });

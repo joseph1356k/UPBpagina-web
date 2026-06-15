@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
   if (!USE_SUPABASE) {
     return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
-  const rl = rateLimit(request, "admin-event-types", { max: 20, windowMs: 60_000 });
+  const rl = await rateLimit(request, "admin-event-types", { max: 20, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
   const csrf = assertSameOrigin(request);
   if (!csrf.ok) return csrf.response;

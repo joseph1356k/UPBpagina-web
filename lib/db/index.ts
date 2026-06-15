@@ -276,7 +276,10 @@ export async function getAuditLog(
 export async function getCeremonyStats(
   ceremonyId: string,
 ): Promise<CeremonyStats> {
-  const supabase = await createClient();
+  // SECURITY DEFINER global aggregate, called only from staff-gated server
+  // pages. Uses the service client so the RPC can be hidden from the public
+  // REST API (EXECUTE revoked from anon + authenticated).
+  const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("get_ceremony_stats", {
     p_ceremony_id: ceremonyId,
   });
@@ -295,7 +298,8 @@ export interface OverviewStats {
 }
 
 export async function getOverviewStats(): Promise<OverviewStats> {
-  const supabase = await createClient();
+  // See getCeremonyStats — service client so the RPC stays off the public API.
+  const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("get_overview_stats");
   if (error) throw error;
   return data as unknown as OverviewStats;
@@ -868,7 +872,10 @@ export async function simulateScan(args: {
       "[db] simulateScan requires a real QR `token` in Supabase mode.",
     );
   }
-  const supabase = await createClient();
+  // The live scanner path is POST /api/qr/validate (also service-client).
+  // validate_qr_token verifies the scanner role internally, so it stays
+  // hidden from the public REST API (EXECUTE revoked from anon+authenticated).
+  const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("validate_qr_token", {
     p_token: args.token,
     p_scanner_id: args.scannedByUserId,

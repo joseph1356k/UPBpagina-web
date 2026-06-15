@@ -35,7 +35,7 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
 
-  const rl = rateLimit(request, "graduate-guests-write", {
+  const rl = await rateLimit(request, "graduate-guests-write", {
     max: 30,
     windowMs: 60_000,
   });
@@ -114,7 +114,7 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
 
-  const rl = rateLimit(request, "graduate-guests-write", {
+  const rl = await rateLimit(request, "graduate-guests-write", {
     max: 30,
     windowMs: 60_000,
   });

@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
 
-  const rl = rateLimit(request, "graduate-photo", { max: 10, windowMs: 60_000 });
+  const rl = await rateLimit(request, "graduate-photo", { max: 10, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
 
   const csrf = assertSameOrigin(request);
