@@ -55,6 +55,7 @@ function validate(f: Fields): FieldErrors {
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "admin", label: USER_ROLE_LABEL.admin },
   { value: "coordinator", label: USER_ROLE_LABEL.coordinator },
+  { value: "organizer", label: USER_ROLE_LABEL.organizer },
   { value: "scanner", label: USER_ROLE_LABEL.scanner },
 ];
 

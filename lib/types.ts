@@ -22,7 +22,7 @@ export type GraduateStatus =
 
 export type GuestStatus = "pending" | "invited" | "checked_in" | "revoked";
 
-export type UserRole = "admin" | "scanner" | "coordinator";
+export type UserRole = "admin" | "scanner" | "coordinator" | "organizer";
 
 export type ScanResult = "allowed" | "denied";
 
@@ -72,8 +72,28 @@ export interface Ceremony {
   status: CeremonyStatus;
   registrationClosesAt: string; // ISO datetime
   maxGuestsDefault: number;
+  /** Answers to the event type's custom fields (keyed by field.key). */
+  customData: Record<string, string>;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Admin-managed event type (table: event_types). */
+export interface EventTypeRecord {
+  value: string;
+  label: string;
+  eventNoun: string;
+  participantSingular: string;
+  participantPlural: string;
+  guestSingular: string;
+  guestPlural: string;
+  invitePhrase: string;
+  photoRecommended: boolean;
+  defaultTemplate: string;
+  customFields: import("./terminology").CustomFieldDef[];
+  isBuiltin: boolean;
+  active: boolean;
+  sortOrder: number;
 }
 
 /** A participant (the person who registers guests). Table: `graduates`. */

@@ -355,6 +355,40 @@ export async function updateCeremony(
   return updated;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Event types (mock — derived from the built-in registry)            */
+/* ------------------------------------------------------------------ */
+
+export async function getEventTypes(
+  opts: { activeOnly?: boolean } = {},
+): Promise<import("../types").EventTypeRecord[]> {
+  await delay();
+  void opts; // mock returns all built-ins regardless
+  const { EVENT_TYPES } = await import("../terminology");
+  return EVENT_TYPES.map((t, i) => ({
+    value: t.value,
+    label: t.label,
+    eventNoun: t.eventNoun,
+    participantSingular: t.participantSingular,
+    participantPlural: t.participantPlural,
+    guestSingular: t.guestSingular,
+    guestPlural: t.guestPlural,
+    invitePhrase: t.invitePhrase,
+    photoRecommended: t.photoRecommended,
+    defaultTemplate: t.defaultTemplate,
+    customFields: t.customFields ?? [],
+    isBuiltin: true,
+    active: true,
+    sortOrder: (i + 1) * 10,
+  }));
+}
+
+export async function getEventOrganizerIds(ceremonyId: string): Promise<string[]> {
+  await delay();
+  void ceremonyId; // mock has no organizer assignments
+  return [];
+}
+
 export type CreateUserInput = Omit<User, "id" | "createdAt" | "lastSignInAt">;
 export type UpdateUserInput = Partial<Omit<User, "id" | "createdAt">>;
 

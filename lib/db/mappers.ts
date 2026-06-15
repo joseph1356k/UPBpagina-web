@@ -32,8 +32,32 @@ export function ceremonyFromRow(row: Tables["ceremonies"]["Row"]): Ceremony {
     status: row.status,
     registrationClosesAt: row.registration_closes_at,
     maxGuestsDefault: row.max_guests_default,
+    customData: (row.custom_data as Record<string, string>) ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function eventTypeFromRow(
+  row: Tables["event_types"]["Row"],
+): import("@/lib/types").EventTypeRecord {
+  return {
+    value: row.value,
+    label: row.label,
+    eventNoun: row.event_noun,
+    participantSingular: row.participant_singular,
+    participantPlural: row.participant_plural,
+    guestSingular: row.guest_singular,
+    guestPlural: row.guest_plural,
+    invitePhrase: row.invite_phrase,
+    photoRecommended: row.photo_recommended,
+    defaultTemplate: row.default_template,
+    customFields: Array.isArray(row.custom_fields)
+      ? (row.custom_fields as import("@/lib/terminology").CustomFieldDef[])
+      : [],
+    isBuiltin: row.is_builtin,
+    active: row.active,
+    sortOrder: row.sort_order,
   };
 }
 

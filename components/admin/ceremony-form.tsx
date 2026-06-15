@@ -25,8 +25,8 @@ import {
 import { adminApi } from "@/lib/api-client";
 import type { CreateCeremonyInput } from "@/lib/data";
 import { EMAIL_TEMPLATES } from "@/lib/email-templates";
-import { EVENT_TYPES, getTerminology } from "@/lib/terminology";
-import type { Ceremony, CeremonyStatus } from "@/lib/types";
+import { EVENT_TYPES } from "@/lib/terminology";
+import type { Ceremony, CeremonyStatus, EventTypeRecord } from "@/lib/types";
 
 /* ------------------------------------------------------------------ */
 /*  Types & validation                                                 */
@@ -102,6 +102,8 @@ export interface CeremonyFormProps {
   onOpenChange: (open: boolean) => void;
   ceremony?: Ceremony | null;
   onSave: (c: Ceremony) => void;
+  /** Admin-managed event types (from DB). Falls back to built-ins. */
+  eventTypes?: EventTypeRecord[];
 }
 
 export function CeremonyForm({
@@ -109,6 +111,7 @@ export function CeremonyForm({
   onOpenChange,
   ceremony,
   onSave,
+  eventTypes,
 }: CeremonyFormProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -117,6 +120,7 @@ export function CeremonyForm({
           <CeremonyFormContents
             key={ceremony?.id ?? "new"}
             ceremony={ceremony ?? null}
+            eventTypes={eventTypes}
             onClose={() => onOpenChange(false)}
             onSave={onSave}
           />
@@ -132,21 +136,47 @@ export function CeremonyForm({
 
 interface InnerProps {
   ceremony: Ceremony | null;
+  eventTypes?: EventTypeRecord[];
   onClose: () => void;
   onSave: (c: Ceremony) => void;
 }
 
-function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
+/** Built-in registry as a fallback when DB types weren't passed. */
+const BUILTIN_AS_RECORDS: EventTypeRecord[] = EVENT_TYPES.map((t, i) => ({
+  value: t.value,
+  label: t.label,
+  eventNoun: t.eventNoun,
+  participantSingular: t.participantSingular,
+  participantPlural: t.participantPlural,
+  guestSingular: t.guestSingular,
+  guestPlural: t.guestPlural,
+  invitePhrase: t.invitePhrase,
+  photoRecommended: t.photoRecommended,
+  defaultTemplate: t.defaultTemplate,
+  customFields: t.customFields ?? [],
+  isBuiltin: true,
+  active: true,
+  sortOrder: (i + 1) * 10,
+}));
+
+function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerProps) {
   const isEdit = Boolean(ceremony);
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
 
+  const types =
+    eventTypes && eventTypes.length > 0 ? eventTypes : BUILTIN_AS_RECORDS;
+  const typeByValue = new Map(types.map((t) => [t.value, t]));
+  const firstType = types[0]?.value ?? "graduation";
+
   const [fields, setFields] = useState<Fields>({
     name: ceremony?.name ?? "",
-    eventType: ceremony?.eventType ?? "graduation",
+    eventType: ceremony?.eventType ?? firstType,
     emailTemplate:
-      ceremony?.emailTemplate ?? getTerminology("graduation").defaultTemplate,
+      ceremony?.emailTemplate ??
+      typeByValue.get(ceremony?.eventType ?? firstType)?.defaultTemplate ??
+      "clasica",
     date: ceremony?.date ?? "",
     startTime: ceremony?.startTime ?? "",
     endTime: ceremony?.endTime ?? "",
@@ -160,6 +190,12 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
       : "",
   });
 
+  // Answers to the selected type's custom fields.
+  const [customData, setCustomData] = useState<Record<string, string>>(
+    ceremony?.customData ?? {},
+  );
+  const activeCustomFields = typeByValue.get(fields.eventType)?.customFields ?? [];
+
   function set<K extends keyof Fields>(key: K, value: Fields[K]) {
     setFields((prev) => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
@@ -170,8 +206,8 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
    *  previous type's default). */
   function setEventType(next: string) {
     setFields((prev) => {
-      const prevDefault = getTerminology(prev.eventType).defaultTemplate;
-      const nextDefault = getTerminology(next).defaultTemplate;
+      const prevDefault = typeByValue.get(prev.eventType)?.defaultTemplate;
+      const nextDefault = typeByValue.get(next)?.defaultTemplate ?? "clasica";
       return {
         ...prev,
         eventType: next,
@@ -205,6 +241,11 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
           registrationClosesAt: fields.registrationClosesAt
             ? new Date(fields.registrationClosesAt).toISOString()
             : new Date(`${fields.date}T23:59:59`).toISOString(),
+          customData: Object.fromEntries(
+            activeCustomFields
+              .map((cf) => [cf.key, (customData[cf.key] ?? "").trim()])
+              .filter(([, v]) => v !== ""),
+          ),
         };
 
         let saved: Ceremony;
@@ -259,13 +300,13 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
           >
             <Select
               value={fields.eventType}
-              onValueChange={(v) => setEventType(String(v ?? "graduation"))}
+              onValueChange={(v) => setEventType(String(v ?? firstType))}
             >
               <SelectTrigger className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {EVENT_TYPES.map((t) => (
+                {types.map((t) => (
                   <SelectItem key={t.value} value={t.value}>
                     {t.label}
                   </SelectItem>
@@ -429,6 +470,53 @@ function CeremonyFormContents({ ceremony, onClose, onSave }: InnerProps) {
               </SelectContent>
             </Select>
           </Field>
+
+          {/* Custom fields for this event type */}
+          {activeCustomFields.length > 0 && (
+            <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+              <p className="text-[0.7rem] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                Campos de {typeByValue.get(fields.eventType)?.label}
+              </p>
+              {activeCustomFields.map((cf) => (
+                <Field key={cf.key} label={cf.label} hint={cf.hint}>
+                  {cf.type === "select" && cf.options ? (
+                    <Select
+                      value={customData[cf.key] || undefined}
+                      onValueChange={(v) =>
+                        setCustomData((p) => ({ ...p, [cf.key]: String(v ?? "") }))
+                      }
+                    >
+                      <SelectTrigger className="h-9 w-full">
+                        <SelectValue placeholder="Seleccionar…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cf.options.map((o) => (
+                          <SelectItem key={o} value={o}>
+                            {o}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      type={
+                        cf.type === "number"
+                          ? "number"
+                          : cf.type === "date"
+                            ? "date"
+                            : "text"
+                      }
+                      value={customData[cf.key] ?? ""}
+                      onChange={(e) =>
+                        setCustomData((p) => ({ ...p, [cf.key]: e.target.value }))
+                      }
+                      className="h-9"
+                    />
+                  )}
+                </Field>
+              ))}
+            </div>
+          )}
 
           {/* Registration closes */}
           <Field

@@ -46,9 +46,14 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // ── /admin/* — staff only (admin/coordinator + active) ──────────────
+  // ── /admin/* — staff only (admin/coordinator/organizer + active) ────
+  // Organizers reach /admin but RLS scopes them to their assigned events.
   if (path.startsWith(ADMIN_PREFIX)) {
-    if (!userId || !active || (role !== "admin" && role !== "coordinator")) {
+    if (
+      !userId ||
+      !active ||
+      (role !== "admin" && role !== "coordinator" && role !== "organizer")
+    ) {
       return redirectToLogin(request, STAFF_LOGIN, path);
     }
     return response;

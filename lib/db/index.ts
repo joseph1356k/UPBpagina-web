@@ -32,11 +32,14 @@ import type {
 import {
   auditFromRow,
   ceremonyFromRow,
+  eventTypeFromRow,
   graduateFromRow,
   guestFromRow,
   scanEventFromRow,
   userFromRow,
 } from "./mappers";
+import type { CustomFieldDef } from "@/lib/terminology";
+import type { EventTypeRecord } from "@/lib/types";
 
 /* ────────────────────────────────────────────────────────────────────
    Ceremonies
@@ -380,6 +383,7 @@ export async function createCeremony(
       status: data.status,
       registration_closes_at: data.registrationClosesAt,
       max_guests_default: data.maxGuestsDefault,
+      custom_data: data.customData ?? {},
     })
     .select()
     .single();
@@ -410,6 +414,7 @@ export async function updateCeremony(
     update.registration_closes_at = patch.registrationClosesAt;
   if (patch.maxGuestsDefault !== undefined)
     update.max_guests_default = patch.maxGuestsDefault;
+  if (patch.customData !== undefined) update.custom_data = patch.customData;
 
   const { data: row, error } = await supabase
     .from("ceremonies")
@@ -419,6 +424,127 @@ export async function updateCeremony(
     .single();
   if (error) throw error;
   return ceremonyFromRow(row);
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Event types (admin-managed catalog) + organizer assignments
+   ──────────────────────────────────────────────────────────────────── */
+
+export async function getEventTypes(
+  opts: { activeOnly?: boolean } = {},
+): Promise<EventTypeRecord[]> {
+  const supabase = await createClient();
+  let q = supabase.from("event_types").select("*").order("sort_order");
+  if (opts.activeOnly) q = q.eq("active", true);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map(eventTypeFromRow);
+}
+
+export interface CreateEventTypeInput {
+  value: string;
+  label: string;
+  eventNoun: string;
+  participantSingular: string;
+  participantPlural: string;
+  guestSingular: string;
+  guestPlural: string;
+  invitePhrase: string;
+  photoRecommended: boolean;
+  defaultTemplate: string;
+  customFields?: CustomFieldDef[];
+  sortOrder?: number;
+}
+export type UpdateEventTypeInput = Partial<Omit<CreateEventTypeInput, "value">> & {
+  active?: boolean;
+};
+
+export async function createEventType(
+  data: CreateEventTypeInput,
+): Promise<EventTypeRecord> {
+  const service = createServiceClient();
+  const { data: row, error } = await service
+    .from("event_types")
+    .insert({
+      value: data.value,
+      label: data.label,
+      event_noun: data.eventNoun,
+      participant_singular: data.participantSingular,
+      participant_plural: data.participantPlural,
+      guest_singular: data.guestSingular,
+      guest_plural: data.guestPlural,
+      invite_phrase: data.invitePhrase,
+      photo_recommended: data.photoRecommended,
+      default_template: data.defaultTemplate,
+      custom_fields: (data.customFields ?? []) as unknown,
+      is_builtin: false,
+      sort_order: data.sortOrder ?? 200,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return eventTypeFromRow(row);
+}
+
+export async function updateEventType(
+  value: string,
+  patch: UpdateEventTypeInput,
+): Promise<EventTypeRecord> {
+  const service = createServiceClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const update: any = {};
+  if (patch.label !== undefined) update.label = patch.label;
+  if (patch.eventNoun !== undefined) update.event_noun = patch.eventNoun;
+  if (patch.participantSingular !== undefined)
+    update.participant_singular = patch.participantSingular;
+  if (patch.participantPlural !== undefined)
+    update.participant_plural = patch.participantPlural;
+  if (patch.guestSingular !== undefined)
+    update.guest_singular = patch.guestSingular;
+  if (patch.guestPlural !== undefined) update.guest_plural = patch.guestPlural;
+  if (patch.invitePhrase !== undefined)
+    update.invite_phrase = patch.invitePhrase;
+  if (patch.photoRecommended !== undefined)
+    update.photo_recommended = patch.photoRecommended;
+  if (patch.defaultTemplate !== undefined)
+    update.default_template = patch.defaultTemplate;
+  if (patch.customFields !== undefined)
+    update.custom_fields = patch.customFields as unknown;
+  if (patch.active !== undefined) update.active = patch.active;
+  if (patch.sortOrder !== undefined) update.sort_order = patch.sortOrder;
+
+  const { data: row, error } = await service
+    .from("event_types")
+    .update(update)
+    .eq("value", value)
+    .select()
+    .single();
+  if (error) throw error;
+  return eventTypeFromRow(row);
+}
+
+/** Replace the full organizer set of an event (admin action). */
+export async function setEventOrganizers(
+  ceremonyId: string,
+  userIds: string[],
+): Promise<void> {
+  const service = createServiceClient();
+  await service.from("event_organizers").delete().eq("ceremony_id", ceremonyId);
+  if (userIds.length > 0) {
+    const rows = userIds.map((user_id) => ({ ceremony_id: ceremonyId, user_id }));
+    const { error } = await service.from("event_organizers").insert(rows);
+    if (error) throw error;
+  }
+}
+
+export async function getEventOrganizerIds(ceremonyId: string): Promise<string[]> {
+  const service = createServiceClient();
+  const { data, error } = await service
+    .from("event_organizers")
+    .select("user_id")
+    .eq("ceremony_id", ceremonyId);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.user_id);
 }
 
 export type CreateUserInput = Omit<

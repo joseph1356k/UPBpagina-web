@@ -34,7 +34,7 @@ export type GraduateStatusDb =
   | "registered"
   | "completed";
 export type GuestStatusDb = "pending" | "invited" | "checked_in" | "revoked";
-export type UserRoleDb = "admin" | "scanner" | "coordinator";
+export type UserRoleDb = "admin" | "scanner" | "coordinator" | "organizer";
 export type ScanResultDb = "allowed" | "denied";
 export type ScanDeniedReasonDb =
   | "already_used"
@@ -62,6 +62,7 @@ export interface Database {
           status: CeremonyStatusDb;
           registration_closes_at: Timestamp;
           max_guests_default: number;
+          custom_data: Record<string, unknown>;
           created_at: Timestamp;
           updated_at: Timestamp;
         };
@@ -79,6 +80,7 @@ export interface Database {
           status?: CeremonyStatusDb;
           registration_closes_at: Timestamp;
           max_guests_default?: number;
+          custom_data?: Record<string, unknown>;
           created_at?: Timestamp;
           updated_at?: Timestamp;
         };
@@ -96,7 +98,77 @@ export interface Database {
           status?: CeremonyStatusDb;
           registration_closes_at?: Timestamp;
           max_guests_default?: number;
+          custom_data?: Record<string, unknown>;
           updated_at?: Timestamp;
+        };
+        Relationships: [];
+      };
+      event_types: {
+        Row: {
+          value: string;
+          label: string;
+          event_noun: string;
+          participant_singular: string;
+          participant_plural: string;
+          guest_singular: string;
+          guest_plural: string;
+          invite_phrase: string;
+          photo_recommended: boolean;
+          default_template: string;
+          custom_fields: unknown;
+          is_builtin: boolean;
+          active: boolean;
+          sort_order: number;
+          created_at: Timestamp;
+          updated_at: Timestamp;
+        };
+        Insert: {
+          value: string;
+          label: string;
+          event_noun?: string;
+          participant_singular?: string;
+          participant_plural?: string;
+          guest_singular?: string;
+          guest_plural?: string;
+          invite_phrase?: string;
+          photo_recommended?: boolean;
+          default_template?: string;
+          custom_fields?: unknown;
+          is_builtin?: boolean;
+          active?: boolean;
+          sort_order?: number;
+        };
+        Update: {
+          label?: string;
+          event_noun?: string;
+          participant_singular?: string;
+          participant_plural?: string;
+          guest_singular?: string;
+          guest_plural?: string;
+          invite_phrase?: string;
+          photo_recommended?: boolean;
+          default_template?: string;
+          custom_fields?: unknown;
+          active?: boolean;
+          sort_order?: number;
+          updated_at?: Timestamp;
+        };
+        Relationships: [];
+      };
+      event_organizers: {
+        Row: {
+          ceremony_id: string;
+          user_id: string;
+          created_at: Timestamp;
+        };
+        Insert: {
+          ceremony_id: string;
+          user_id: string;
+          created_at?: Timestamp;
+        };
+        Update: {
+          ceremony_id?: string;
+          user_id?: string;
         };
         Relationships: [];
       };

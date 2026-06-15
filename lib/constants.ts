@@ -35,6 +35,7 @@ export const ROUTES = {
   adminAuditoria: "/admin/auditoria",
   adminEscaneos: "/admin/escaneos",
   adminReportes: "/admin/reportes",
+  adminTipos: "/admin/tipos",
   adminConfiguracion: "/admin/configuracion",
 
   // Public invitation
@@ -109,6 +110,7 @@ export const USER_ROLE_LABEL: Record<UserRole, string> = {
   admin: "Administrador",
   scanner: "Personal de escaneo",
   coordinator: "Coordinador",
+  organizer: "Organizador",
 };
 
 export const SCAN_RESULT_LABEL: Record<ScanResult, string> = {

@@ -96,6 +96,9 @@ export const getAuditLog           = route("getAuditLog");
 export const getCeremonyStats      = route("getCeremonyStats");
 export const getOverviewStats      = route("getOverviewStats");
 
+export const getEventTypes         = route("getEventTypes");
+export const getEventOrganizerIds  = route("getEventOrganizerIds");
+
 /* ──────────────────────────────────────────────────────────────────
    Admin/joined queries
    ────────────────────────────────────────────────────────────────── */

@@ -32,9 +32,22 @@ export type EventType =
   | "business"
   | "other";
 
+/**
+ * A custom field definition attached to an event type. Answers live in
+ * ceremonies.custom_data keyed by `key`.
+ */
+export interface CustomFieldDef {
+  key: string;
+  label: string;
+  type: "text" | "number" | "date" | "select";
+  options?: string[];
+  required?: boolean;
+  hint?: string;
+}
+
 export interface EventTerminology {
   /** Stored value (ceremonies.event_type). */
-  value: EventType;
+  value: string;
   /** Display name of the event type. */
   label: string;
   /** "ceremonia", "evento", "conferencia"… used in phrases. */
@@ -51,6 +64,8 @@ export interface EventTerminology {
   photoRecommended: boolean;
   /** Suggested email template key (admin can override per event). */
   defaultTemplate: "clasica" | "elegante" | "moderna";
+  /** Per-type custom fields (empty for built-ins until an admin adds some). */
+  customFields?: CustomFieldDef[];
 }
 
 export const EVENT_TYPES: readonly EventTerminology[] = [
@@ -221,13 +236,61 @@ export const EVENT_TYPE_VALUES = EVENT_TYPES.map((t) => t.value) as [
 ];
 
 /**
- * Resolve the terminology for an event type. Unknown / legacy values fall
- * back to graduation (the platform's original behaviour) so old rows can
- * never break the UI.
+ * Resolve the terminology for an event type from the BUILT-IN registry.
+ * Sync + always available — used by client components and zod.
+ *
+ * Admin-managed types (lib/db event_types table) are the source of truth
+ * at runtime; resolve those with `terminologyFromRow` (server side) or by
+ * passing the loaded list to components. This fallback guarantees old /
+ * unknown values never break the UI.
  */
 export function getTerminology(eventType: string | null | undefined): EventTerminology {
   return BY_VALUE.get(eventType as EventType) ?? BY_VALUE.get("graduation")!;
 }
+
+/** Shape of an event_types DB row (snake_case) for the mapper below. */
+export interface EventTypeRow {
+  value: string;
+  label: string;
+  event_noun: string;
+  participant_singular: string;
+  participant_plural: string;
+  guest_singular: string;
+  guest_plural: string;
+  invite_phrase: string;
+  photo_recommended: boolean;
+  default_template: string;
+  custom_fields?: unknown;
+  active?: boolean;
+  sort_order?: number;
+  is_builtin?: boolean;
+}
+
+/** Build runtime terminology from a DB row (admin-managed types). */
+export function terminologyFromRow(row: EventTypeRow): EventTerminology {
+  return {
+    value: row.value,
+    label: row.label,
+    eventNoun: row.event_noun,
+    participantSingular: row.participant_singular,
+    participantPlural: row.participant_plural,
+    guestSingular: row.guest_singular,
+    guestPlural: row.guest_plural,
+    invitePhrase: row.invite_phrase,
+    photoRecommended: row.photo_recommended,
+    defaultTemplate: (["clasica", "elegante", "moderna"].includes(
+      row.default_template,
+    )
+      ? row.default_template
+      : "clasica") as EventTerminology["defaultTemplate"],
+    customFields: Array.isArray(row.custom_fields)
+      ? (row.custom_fields as CustomFieldDef[])
+      : [],
+  };
+}
+
+/** A slug is a valid event-type value shape (DB-stored, app-validated). */
+export const EVENT_TYPE_SLUG_RE = /^[a-z][a-z0-9_-]{1,39}$/;
 
 /** Capitalize the first letter (labels arrive lowercase by design). */
 export function cap(s: string): string {

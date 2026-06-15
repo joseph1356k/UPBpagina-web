@@ -31,8 +31,8 @@ import {
   ROUTES,
 } from "@/lib/constants";
 import { formatDateShort, formatTime } from "@/lib/format";
-import { EVENT_TYPES, getTerminology } from "@/lib/terminology";
-import type { Ceremony, CeremonyStatus } from "@/lib/types";
+import { getTerminology } from "@/lib/terminology";
+import type { Ceremony, CeremonyStatus, EventTypeRecord } from "@/lib/types";
 
 const PAGE_SIZE = 10;
 
@@ -46,9 +46,10 @@ const STATUS_FILTER_OPTIONS: { value: CeremonyStatus; label: string }[] = [
 
 interface Props {
   initialCeremonies: Ceremony[];
+  eventTypes?: EventTypeRecord[];
 }
 
-export function CeremoniesTable({ initialCeremonies }: Props) {
+export function CeremoniesTable({ initialCeremonies, eventTypes }: Props) {
   const [ceremonies, setCeremonies] = useState(initialCeremonies);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -56,6 +57,19 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
   const [page, setPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Ceremony | null>(null);
+
+  // Label resolver: prefer DB types, fall back to built-in registry.
+  const typeLabel = useMemo(() => {
+    const map = new Map((eventTypes ?? []).map((t) => [t.value, t.label]));
+    return (value: string) => map.get(value) ?? getTerminology(value).label;
+  }, [eventTypes]);
+  const typeFilterOptions = useMemo(
+    () =>
+      (eventTypes ?? []).length > 0
+        ? eventTypes!.map((t) => ({ value: t.value, label: t.label }))
+        : [],
+    [eventTypes],
+  );
 
   const filtered = useMemo(() => {
     let result = ceremonies;
@@ -124,7 +138,7 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
               id: "type",
               value: typeFilter,
               placeholder: "Todos los tipos",
-              options: EVENT_TYPES.map((t) => ({ value: t.value, label: t.label })),
+              options: typeFilterOptions,
               onValueChange: (v) => { setTypeFilter(v); setPage(1); },
               className: "w-52",
             },
@@ -188,7 +202,7 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
                       {c.name}
                     </Link>
                     <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">
-                      {getTerminology(c.eventType).label}
+                      {typeLabel(c.eventType)}
                     </p>
                     <p className="text-xs text-muted-foreground lg:hidden mt-0.5">
                       <CeremonyStatusBadge status={c.status} className="lg:hidden" />
@@ -196,7 +210,7 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
                     <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      {getTerminology(c.eventType).label}
+                      {typeLabel(c.eventType)}
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -267,6 +281,7 @@ export function CeremoniesTable({ initialCeremonies }: Props) {
         open={formOpen}
         onOpenChange={setFormOpen}
         ceremony={editing}
+        eventTypes={eventTypes}
         onSave={handleSave}
       />
     </div>

@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   ScanLine,
   Settings,
+  Tags,
   Upload,
   Users,
   UsersRound,
@@ -77,6 +78,11 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   {
     label: "Sistema",
     items: [
+      {
+        label: "Tipos de evento",
+        href: ROUTES.adminTipos,
+        icon: Tags,
+      },
       {
         label: "Usuarios",
         href: ROUTES.adminUsuarios,

@@ -56,12 +56,14 @@ export type SendInvitationsInput = z.infer<typeof SendInvitationsBody>;
    Admin mutations — ceremonies
    ──────────────────────────────────────────────────────────────────── */
 
-import { EVENT_TYPE_VALUES } from "@/lib/terminology";
+import { EVENT_TYPE_SLUG_RE } from "@/lib/terminology";
 import { EMAIL_TEMPLATE_KEYS } from "@/lib/email-templates";
 
 const CeremonyBase = {
   name: z.string().trim().min(3).max(120),
-  eventType: z.enum(EVENT_TYPE_VALUES),
+  // Slug-format (not a closed enum) so admin-created custom types pass.
+  // Existence is implicitly guaranteed by the form's select.
+  eventType: z.string().trim().regex(EVENT_TYPE_SLUG_RE, "tipo inválido"),
   emailTemplate: z.enum(EMAIL_TEMPLATE_KEYS),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "fecha YYYY-MM-DD"),
   startTime: z.string().regex(/^\d{2}:\d{2}$/, "hora HH:MM"),
@@ -72,6 +74,7 @@ const CeremonyBase = {
   status: z.enum(["draft", "open", "closed", "in_progress", "completed"]),
   maxGuestsDefault: z.number().int().min(1).max(20),
   registrationClosesAt: z.string().min(10).max(40),
+  customData: z.record(z.string(), z.string().max(500)).optional().default({}),
 };
 
 export const CreateCeremonyBody = z.object(CeremonyBase);
@@ -86,14 +89,14 @@ export type UpdateCeremonyBodyT = z.infer<typeof UpdateCeremonyBody>;
 export const CreateUserBody = z.object({
   fullName: z.string().trim().min(2).max(80),
   email: z.string().trim().toLowerCase().email().max(120),
-  role: z.enum(["admin", "scanner", "coordinator"]),
+  role: z.enum(["admin", "scanner", "coordinator", "organizer"]),
   active: z.boolean(),
 });
 
 export const UpdateUserBody = z.object({
   fullName: z.string().trim().min(2).max(80).optional(),
   email: z.string().trim().toLowerCase().email().max(120).optional(),
-  role: z.enum(["admin", "scanner", "coordinator"]).optional(),
+  role: z.enum(["admin", "scanner", "coordinator", "organizer"]).optional(),
   active: z.boolean().optional(),
 });
 export type CreateUserBodyT = z.infer<typeof CreateUserBody>;
