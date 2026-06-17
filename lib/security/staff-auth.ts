@@ -15,6 +15,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
+import { USE_SUPABASE } from "@/lib/supabase/env";
 import type { UserRoleDb } from "@/lib/supabase/types";
 
 export type StaffAuthOk = {
@@ -63,4 +64,41 @@ export async function requireStaff(
   }
 
   return { ok: true, userId: user.id, role: profile.role };
+}
+
+export interface CurrentStaff {
+  userId: string;
+  fullName: string;
+  role: UserRoleDb;
+}
+
+/**
+ * Resolve the current staff member for Server Components (sidebar, page-level
+ * role gating). Unlike `requireStaff`, returns `null` instead of a response, so
+ * it's safe to call from RSC. In mock mode returns a stand-in admin so the
+ * demo shell renders without auth.
+ */
+export async function getCurrentStaff(): Promise<CurrentStaff | null> {
+  if (!USE_SUPABASE) {
+    return {
+      userId: "usr_admin_mock",
+      fullName: "Administrador (mock)",
+      role: "admin",
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("full_name, role, active")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile?.active) return null;
+
+  return { userId: user.id, fullName: profile.full_name, role: profile.role };
 }

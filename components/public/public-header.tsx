@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
 
 const NAV_LINKS = [
+  { label: "Eventos", href: "/eventos" },
   { label: "Cómo funciona", href: "/#como-funciona" },
   { label: "Para administradores", href: "/#admin" },
   { label: "Soporte", href: "/#soporte" },

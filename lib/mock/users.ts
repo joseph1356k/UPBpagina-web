@@ -64,4 +64,13 @@ export const users: User[] = [
     lastSignInAt: "2026-04-18T08:09:00-05:00",
     createdAt: "2026-03-01T10:00:00-05:00",
   },
+  {
+    id: "usr_org_01",
+    email: "laura.mejia@upb.edu.co",
+    fullName: "Laura Mejía Arango",
+    role: "organizer",
+    active: true,
+    lastSignInAt: "2026-05-15T10:02:00-05:00",
+    createdAt: "2026-03-05T10:00:00-05:00",
+  },
 ];

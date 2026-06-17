@@ -11,6 +11,8 @@ import {
   Loader2,
   RotateCcw,
   ScanLine,
+  Search,
+  UserRound,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,13 +27,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// Mock simulator only used when NEXT_PUBLIC_USE_SUPABASE is off.
-import { simulateScan } from "@/lib/mock";
-import { ROUTES, SCAN_DENIED_REASON_LABEL } from "@/lib/constants";
+// Mock data fns only used when NEXT_PUBLIC_USE_SUPABASE is off.
+import {
+  manualCheckIn as mockManualCheckIn,
+  searchCeremonyGuests as mockSearchGuests,
+  simulateScan,
+} from "@/lib/mock";
+import {
+  GUEST_STATUS_LABEL,
+  ROUTES,
+  SCAN_DENIED_REASON_LABEL,
+} from "@/lib/constants";
 import { formatDocument, formatInitials, formatTime } from "@/lib/format";
 import { useOnline } from "@/lib/pwa/use-online";
 import { enqueueScan } from "@/lib/pwa/scan-queue";
 import { USE_SUPABASE } from "@/lib/supabase/env";
+import type { GuestSearchRow } from "@/lib/mock";
 import type { Ceremony, ScanDeniedReason, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -78,11 +89,16 @@ export function ScannerUI({ operator, ceremonies }: Props) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualValue, setManualValue] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [searchResults, setSearchResults] = useState<GuestSearchRow[]>([]);
+  const [searching, setSearching] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   // Guards re-entry while a validation is in flight (camera keeps firing)
   const busyRef = useRef(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const operatorName = operator?.fullName ?? "Operador";
   const activeCeremony = ceremonies.find((c) => c.id === ceremonyId);
@@ -241,6 +257,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
     return () => {
       scannerRef.current?.destroy();
       scannerRef.current = null;
+      if (searchTimer.current) clearTimeout(searchTimer.current);
     };
   }, []);
 
@@ -257,6 +274,112 @@ export function ScannerUI({ operator, ceremonies }: Props) {
     setManualValue("");
     void validateToken(token);
   }
+
+  /* ── Search by name + manual check-in ────────────────────────────── */
+
+  const runSearch = useCallback(
+    async (q: string): Promise<GuestSearchRow[]> => {
+      if (!USE_SUPABASE) return mockSearchGuests({ ceremonyId, query: q });
+      const res = await fetch(
+        `/api/qr/search?ceremony=${encodeURIComponent(ceremonyId)}&q=${encodeURIComponent(q)}`,
+        { credentials: "same-origin" },
+      );
+      const json = (await res.json().catch(() => ({}))) as {
+        results?: GuestSearchRow[];
+      };
+      return Array.isArray(json.results) ? json.results : [];
+    },
+    [ceremonyId],
+  );
+
+  // Debounce in the change handler (not an effect) so search stays off the
+  // render path.
+  function onSearchChange(value: string) {
+    setSearchValue(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const q = value.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    searchTimer.current = setTimeout(async () => {
+      try {
+        setSearchResults(await runSearch(q));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+  }
+
+  const manualCheckInGuest = useCallback(
+    async (guestId: string) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      setSearchOpen(false);
+      setSearchValue("");
+      setSearchResults([]);
+      setState({ kind: "validating" });
+
+      try {
+        if (!USE_SUPABASE) {
+          const r = await mockManualCheckIn({
+            guestId,
+            scannedByUserId: operator?.id ?? "usr_scan_demo",
+          });
+          finishScan({
+            result: r.result === "allowed" ? "allowed" : "denied",
+            reason: r.reason,
+            guestName: r.guest?.fullName ?? null,
+            guestDocument: r.guest?.documentNumber ?? null,
+            graduateName: r.graduate?.fullName ?? null,
+            ceremonyName: r.ceremonyName,
+          });
+          return;
+        }
+
+        const res = await fetch("/api/qr/manual-check-in", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ guestId }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          result?: "allowed" | "denied";
+          reason?: ScanDeniedReason | null;
+          guestName?: string | null;
+          guestDocument?: string | null;
+          graduateName?: string | null;
+          ceremonyName?: string | null;
+        };
+        if (!res.ok || !json.result) {
+          finishScan({
+            result: "denied",
+            reason: (json.reason as ScanDeniedReason) ?? "not_found",
+            guestName: json.guestName ?? null,
+            guestDocument: null,
+            graduateName: null,
+            ceremonyName: activeCeremony?.name ?? null,
+          });
+          return;
+        }
+        finishScan({
+          result: json.result,
+          reason: json.reason ?? null,
+          guestName: json.guestName ?? null,
+          guestDocument: json.guestDocument ?? null,
+          graduateName: json.graduateName ?? null,
+          ceremonyName: json.ceremonyName ?? activeCeremony?.name ?? null,
+        });
+      } finally {
+        busyRef.current = false;
+      }
+    },
+    [operator?.id, activeCeremony?.name],
+  );
 
   const showingCamera = state.kind === "camera" || state.kind === "validating";
 
@@ -437,7 +560,10 @@ export function ScannerUI({ operator, ceremonies }: Props) {
           {state.kind !== "result" && (
             <button
               type="button"
-              onClick={() => setManualOpen((v) => !v)}
+              onClick={() => {
+                setManualOpen((v) => !v);
+                setSearchOpen(false);
+              }}
               className="mx-auto flex items-center gap-1.5 text-xs text-background/60 underline-offset-4 hover:text-background hover:underline"
             >
               <Keyboard className="size-3.5" />
@@ -458,6 +584,93 @@ export function ScannerUI({ operator, ceremonies }: Props) {
                 Validar
               </Button>
             </form>
+          )}
+
+          {/* Search-by-name toggle (manual check-in without QR) */}
+          {state.kind !== "result" && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchOpen((v) => !v);
+                setManualOpen(false);
+              }}
+              className="mx-auto flex items-center gap-1.5 text-xs text-background/60 underline-offset-4 hover:text-background hover:underline"
+            >
+              <Search className="size-3.5" />
+              Buscar invitado por nombre
+            </button>
+          )}
+
+          {searchOpen && state.kind !== "result" && (
+            <div className="space-y-2">
+              <Input
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Nombre o documento del invitado"
+                className="h-10 border-white/15 bg-white/5 text-background placeholder:text-background/40"
+                autoFocus
+              />
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-white/10">
+                {searching ? (
+                  <p className="px-3 py-4 text-center text-sm text-background/60">
+                    Buscando…
+                  </p>
+                ) : searchResults.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-sm text-background/50">
+                    {searchValue.trim().length < 2
+                      ? "Escribe al menos 2 caracteres."
+                      : "Sin coincidencias."}
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-white/10">
+                    {searchResults.map((g) => {
+                      const admitted = g.status === "checked_in";
+                      const blocked = g.status === "revoked";
+                      const disabled = admitted || blocked;
+                      return (
+                        <li key={g.id}>
+                          <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => void manualCheckInGuest(g.id)}
+                            className={cn(
+                              "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                              disabled
+                                ? "cursor-not-allowed opacity-60"
+                                : "hover:bg-white/5",
+                            )}
+                          >
+                            <UserRound className="size-4 shrink-0 text-background/50" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-background">
+                                {g.fullName}
+                              </p>
+                              <p className="truncate text-xs text-background/55">
+                                {g.documentNumber
+                                  ? formatDocument(g.documentNumber)
+                                  : g.graduateName}
+                              </p>
+                            </div>
+                            <span
+                              className={cn(
+                                "shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-medium",
+                                admitted
+                                  ? "bg-success/15 text-success"
+                                  : blocked
+                                    ? "bg-destructive/15 text-destructive"
+                                    : "bg-white/10 text-background/70",
+                              )}
+                            >
+                              {GUEST_STATUS_LABEL[g.status]}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
           )}
         </div>
 

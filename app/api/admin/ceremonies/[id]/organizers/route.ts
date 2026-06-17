@@ -1,6 +1,9 @@
 /**
- * PATCH /api/admin/graduates/[id] — update graduate.
- * Requires: admin or coordinator.
+ * POST /api/admin/ceremonies/[id]/organizers — replace an event's organizer set.
+ * Requires: admin or coordinator (assigning who can manage an event is not an
+ * organizer-self action).
+ *
+ * Body: { userIds: string[] }
  */
 
 import { NextResponse, type NextRequest } from "next/server";
@@ -8,10 +11,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { USE_SUPABASE } from "@/lib/supabase/env";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { assertSameOrigin } from "@/lib/security/csrf";
-import { parseJson, UpdateGraduateBody } from "@/lib/security/schemas";
+import { parseJson, SetOrganizersBody } from "@/lib/security/schemas";
 import { requireStaff } from "@/lib/security/staff-auth";
 
-export async function PATCH(
+export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -19,15 +22,16 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
 
-  const rl = await rateLimit(request, "admin-graduates-write", { max: 60, windowMs: 60_000 });
+  const rl = await rateLimit(request, "admin-organizers-write", {
+    max: 30,
+    windowMs: 60_000,
+  });
   if (!rl.ok) return rl.response;
 
   const csrf = assertSameOrigin(request);
   if (!csrf.ok) return csrf.response;
 
-  // Organizers may edit their own events' participants; RLS
-  // (graduates_organizer_write) confines them to assigned events.
-  const auth = await requireStaff(["admin", "coordinator", "organizer"]);
+  const auth = await requireStaff(["admin", "coordinator"]);
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
@@ -35,17 +39,17 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: "invalid_id" }, { status: 400 });
   }
 
-  const parsed = await parseJson(request, UpdateGraduateBody);
+  const parsed = await parseJson(request, SetOrganizersBody);
   if (!parsed.ok) {
     return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
   }
 
-  const { updateGraduateAdmin } = await import("@/lib/db");
+  const { setEventOrganizers } = await import("@/lib/db");
   try {
-    const graduate = await updateGraduateAdmin(id, parsed.data);
-    return NextResponse.json({ ok: true, graduate });
+    await setEventOrganizers(id, parsed.data.userIds);
+    return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[admin/graduates] update failed:", err);
-    return NextResponse.json({ ok: false, error: "update_failed" }, { status: 500 });
+    console.error("[admin/ceremonies/organizers] set failed:", err);
+    return NextResponse.json({ ok: false, error: "set_failed" }, { status: 500 });
   }
 }

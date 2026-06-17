@@ -235,6 +235,7 @@ export function GraduateAuthProvider({ children }: ProviderProps) {
         newGuest = {
           id: `gst_new_${randomId()}`,
           graduateId: state.graduate.id,
+          ceremonyId: null,
           fullName: input.fullName.trim(),
           documentNumber: input.documentNumber?.trim() || null,
           email: input.email?.trim() || null,

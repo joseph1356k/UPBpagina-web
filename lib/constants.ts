@@ -38,6 +38,9 @@ export const ROUTES = {
   adminTipos: "/admin/tipos",
   adminConfiguracion: "/admin/configuracion",
 
+  // Public catalog
+  eventos: "/eventos",
+
   // Public invitation
   invitacion: "/invitacion",
 

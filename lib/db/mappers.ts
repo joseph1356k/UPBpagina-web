@@ -32,6 +32,8 @@ export function ceremonyFromRow(row: Tables["ceremonies"]["Row"]): Ceremony {
     status: row.status,
     registrationClosesAt: row.registration_closes_at,
     maxGuestsDefault: row.max_guests_default,
+    capacity: row.capacity,
+    publicListed: row.public_listed,
     customData: (row.custom_data as Record<string, string>) ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -84,6 +86,7 @@ export function guestFromRow(row: Tables["guests"]["Row"]): Guest {
   return {
     id: row.id,
     graduateId: row.graduate_id,
+    ceremonyId: row.ceremony_id,
     fullName: row.full_name,
     documentNumber: row.document_number,
     email: row.email,

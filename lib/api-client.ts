@@ -95,6 +95,19 @@ export const adminApi = {
     },
   },
 
+  organizers: {
+    async set(ceremonyId: string, userIds: string[]): Promise<void> {
+      if (!USE_SUPABASE) {
+        await mock.setEventOrganizers(ceremonyId, userIds);
+        return;
+      }
+      await call<{ ok: true }>(
+        `/api/admin/ceremonies/${encodeURIComponent(ceremonyId)}/organizers`,
+        { method: "POST", body: { userIds } },
+      );
+    },
+  },
+
   users: {
     async create(input: data.CreateUserInput): Promise<User> {
       if (!USE_SUPABASE) return mock.createUser(input);
@@ -147,5 +160,42 @@ export const adminApi = {
       );
       return r.guest;
     },
+  },
+};
+
+/* ────────────────────────────────────────────────────────────────────
+   Public (unauthenticated) API — self-registration / RSVP
+   ──────────────────────────────────────────────────────────────────── */
+
+export const publicApi = {
+  async registerAttendee(
+    ceremonyId: string,
+    input: {
+      fullName: string;
+      email: string;
+      document?: string | null;
+      captchaToken?: string;
+    },
+  ): Promise<data.RegisterAttendeeResult> {
+    if (!USE_SUPABASE) {
+      return mock.registerAttendee(ceremonyId, {
+        fullName: input.fullName,
+        email: input.email,
+        document: input.document ?? null,
+      });
+    }
+    const res = await fetch(
+      `/api/eventos/${encodeURIComponent(ceremonyId)}/registro`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(input),
+      },
+    );
+    const json = await res
+      .json()
+      .catch(() => ({ ok: false, error: "network" }));
+    return json as data.RegisterAttendeeResult;
   },
 };

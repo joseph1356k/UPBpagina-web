@@ -62,6 +62,8 @@ export interface Database {
           status: CeremonyStatusDb;
           registration_closes_at: Timestamp;
           max_guests_default: number;
+          capacity: number | null;
+          public_listed: boolean;
           custom_data: Record<string, unknown>;
           created_at: Timestamp;
           updated_at: Timestamp;
@@ -80,6 +82,8 @@ export interface Database {
           status?: CeremonyStatusDb;
           registration_closes_at: Timestamp;
           max_guests_default?: number;
+          capacity?: number | null;
+          public_listed?: boolean;
           custom_data?: Record<string, unknown>;
           created_at?: Timestamp;
           updated_at?: Timestamp;
@@ -98,6 +102,8 @@ export interface Database {
           status?: CeremonyStatusDb;
           registration_closes_at?: Timestamp;
           max_guests_default?: number;
+          capacity?: number | null;
+          public_listed?: boolean;
           custom_data?: Record<string, unknown>;
           updated_at?: Timestamp;
         };
@@ -261,7 +267,8 @@ export interface Database {
       guests: {
         Row: {
           id: string;
-          graduate_id: string;
+          graduate_id: string | null;
+          ceremony_id: string | null;
           full_name: string;
           document_number: string | null;
           email: string | null;
@@ -275,7 +282,8 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          graduate_id: string;
+          graduate_id?: string | null;
+          ceremony_id?: string | null;
           full_name: string;
           document_number?: string | null;
           email?: string | null;
@@ -288,6 +296,8 @@ export interface Database {
           updated_at?: Timestamp;
         };
         Update: {
+          graduate_id?: string | null;
+          ceremony_id?: string | null;
           full_name?: string;
           document_number?: string | null;
           email?: string | null;
@@ -304,6 +314,12 @@ export interface Database {
             referencedRelation: "graduates";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "guests_ceremony_id_fkey";
+            columns: ["ceremony_id"];
+            referencedRelation: "ceremonies";
+            referencedColumns: ["id"];
+          },
         ];
       };
       scan_events: {
@@ -314,6 +330,8 @@ export interface Database {
           scanned_at: Timestamp;
           result: ScanResultDb;
           reason: ScanDeniedReasonDb | null;
+          ceremony_id: string | null;
+          method: string;
         };
         Insert: {
           id?: string;
@@ -322,6 +340,8 @@ export interface Database {
           scanned_at?: Timestamp;
           result: ScanResultDb;
           reason?: ScanDeniedReasonDb | null;
+          ceremony_id?: string | null;
+          method?: string;
         };
         Update: Record<string, never>;
         Relationships: [
@@ -379,6 +399,19 @@ export interface Database {
       };
       validate_qr_token: {
         Args: { p_token: string; p_scanner_id: string };
+        Returns: Json;
+      };
+      manual_check_in: {
+        Args: { p_guest_id: string; p_scanner_id: string };
+        Returns: Json;
+      };
+      register_attendee: {
+        Args: {
+          p_ceremony_id: string;
+          p_full_name: string;
+          p_email: string;
+          p_document?: string | null;
+        };
         Returns: Json;
       };
       get_ceremony_stats: {

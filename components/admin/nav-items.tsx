@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { ROUTES } from "@/lib/constants";
+import type { UserRole } from "@/lib/types";
 
 export interface AdminNavItem {
   label: string;
@@ -21,6 +22,8 @@ export interface AdminNavItem {
   icon: LucideIcon;
   exact?: boolean;
   comingSoon?: boolean;
+  /** Staff roles allowed to see this item. Omitted = all staff in /admin. */
+  roles?: UserRole[];
 }
 
 export interface AdminNavGroup {
@@ -62,6 +65,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         label: "Importar base",
         href: ROUTES.adminImportar,
         icon: Upload,
+        roles: ["admin", "coordinator"],
       },
       {
         label: "Escaneos",
@@ -82,21 +86,25 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         label: "Tipos de evento",
         href: ROUTES.adminTipos,
         icon: Tags,
+        roles: ["admin"],
       },
       {
         label: "Usuarios",
         href: ROUTES.adminUsuarios,
         icon: Users,
+        roles: ["admin"],
       },
       {
         label: "Auditoría",
         href: ROUTES.adminAuditoria,
         icon: History,
+        roles: ["admin"],
       },
       {
         label: "Configuración",
         href: ROUTES.adminConfiguracion,
         icon: Settings,
+        roles: ["admin"],
       },
     ],
   },

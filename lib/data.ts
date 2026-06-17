@@ -50,6 +50,8 @@ export type {
   AuditLogRow,
   BulkGraduateInput,
   BulkImportResult,
+  GuestSearchRow,
+  RegisterAttendeeResult,
 } from "@/lib/mock";
 
 /* ──────────────────────────────────────────────────────────────────
@@ -79,6 +81,7 @@ export const getCeremonies         = route("getCeremonies");
 export const getCeremony           = route("getCeremony");
 export const getActiveCeremonies   = route("getActiveCeremonies");
 export const getNextCeremony       = route("getNextCeremony");
+export const getPublicEvents       = route("getPublicEvents");
 
 export const getGraduates          = route("getGraduates");
 export const getGraduate           = route("getGraduate");
@@ -118,6 +121,9 @@ export const getInvitationByToken  = route("getInvitationByToken");
    ────────────────────────────────────────────────────────────────── */
 
 export const simulateScan          = route("simulateScan");
+export const searchCeremonyGuests  = route("searchCeremonyGuests");
+export const manualCheckIn         = route("manualCheckIn");
+export const registerAttendee      = route("registerAttendee");
 
 /* ──────────────────────────────────────────────────────────────────
    Mutations — server-only. Client components use lib/api-client.
@@ -130,3 +136,4 @@ export const revokeGuestAdmin      = route("revokeGuestAdmin");
 export const createUser            = route("createUser");
 export const updateUser            = route("updateUser");
 export const bulkCreateGraduates   = route("bulkCreateGraduates");
+export const setEventOrganizers    = route("setEventOrganizers");

@@ -178,7 +178,11 @@ export function ReportsPanel({
         const rows = filteredCer.map((c) => {
           const cg = graduates.filter((g) => g.ceremonyId === c.id);
           const gids = new Set(cg.map((g) => g.id));
-          const cgu = guests.filter((g) => gids.has(g.graduateId));
+          const cgu = guests.filter(
+            (g) =>
+              (g.graduateId != null && gids.has(g.graduateId)) ||
+              g.ceremonyId === c.id,
+          );
           const checkedIn = cgu.filter((g) => g.status === "checked_in").length;
           const invited = cgu.filter(
             (g) => g.status === "invited" || g.status === "checked_in",

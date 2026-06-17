@@ -72,6 +72,10 @@ export interface Ceremony {
   status: CeremonyStatus;
   registrationClosesAt: string; // ISO datetime
   maxGuestsDefault: number;
+  /** Venue capacity — total guests allowed in. null = no limit. */
+  capacity: number | null;
+  /** Whether this event appears in the public catalog (/eventos). */
+  publicListed: boolean;
   /** Answers to the event type's custom fields (keyed by field.key). */
   customData: Record<string, string>;
   createdAt: string;
@@ -117,7 +121,10 @@ export interface Graduate {
 
 export interface Guest {
   id: string;
-  graduateId: string;
+  /** Participant who registered this guest. null = self-registered attendee. */
+  graduateId: string | null;
+  /** Event this guest belongs to directly (self-reg). null = resolved via graduate. */
+  ceremonyId: string | null;
   fullName: string;
   documentNumber: string | null;
   email: string | null;
@@ -171,6 +178,8 @@ export interface AuditEntry {
  */
 export interface CeremonyStats {
   ceremonyId: string;
+  /** Venue capacity (null = no limit). Mirrors Ceremony.capacity. */
+  capacity: number | null;
   graduatesCount: number;
   graduatesRegistered: number;
   guestsCount: number;

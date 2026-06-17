@@ -23,7 +23,9 @@ export async function POST(
   const csrf = assertSameOrigin(request);
   if (!csrf.ok) return csrf.response;
 
-  const auth = await requireStaff(["admin", "coordinator"]);
+  // Organizers may revoke their own events' guests; RLS
+  // (guests_organizer_write) confines them to assigned events.
+  const auth = await requireStaff(["admin", "coordinator", "organizer"]);
   if (!auth.ok) return auth.response;
 
   const { id } = await params;

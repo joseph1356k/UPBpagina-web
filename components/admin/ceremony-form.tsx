@@ -22,6 +22,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import { adminApi } from "@/lib/api-client";
 import type { CreateCeremonyInput } from "@/lib/data";
 import { EMAIL_TEMPLATES } from "@/lib/email-templates";
@@ -44,6 +45,8 @@ type Fields = {
   faculty: string;
   status: CeremonyStatus;
   maxGuestsDefault: string;
+  capacity: string;
+  publicListed: boolean;
   registrationClosesAt: string;
 };
 
@@ -90,6 +93,10 @@ function validate(f: Fields): FieldErrors {
   const mg = parseInt(f.maxGuestsDefault, 10);
   if (isNaN(mg) || mg < 1 || mg > 20)
     errs.maxGuestsDefault = "Entre 1 y 20 cupos.";
+  if (f.capacity.trim()) {
+    const cap = parseInt(f.capacity, 10);
+    if (isNaN(cap) || cap < 1) errs.capacity = "Debe ser un número mayor a 0.";
+  }
   return errs;
 }
 
@@ -185,6 +192,8 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
     faculty: ceremony?.faculty ?? "",
     status: ceremony?.status ?? "draft",
     maxGuestsDefault: String(ceremony?.maxGuestsDefault ?? "4"),
+    capacity: ceremony?.capacity != null ? String(ceremony.capacity) : "",
+    publicListed: ceremony?.publicListed ?? false,
     registrationClosesAt: ceremony?.registrationClosesAt
       ? ceremony.registrationClosesAt.slice(0, 16)
       : "",
@@ -238,6 +247,10 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
           faculty: fields.faculty.trim(),
           status: fields.status,
           maxGuestsDefault: parseInt(fields.maxGuestsDefault, 10),
+          capacity: fields.capacity.trim()
+            ? parseInt(fields.capacity, 10)
+            : null,
+          publicListed: fields.publicListed,
           registrationClosesAt: fields.registrationClosesAt
             ? new Date(fields.registrationClosesAt).toISOString()
             : new Date(`${fields.date}T23:59:59`).toISOString(),
@@ -444,6 +457,41 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
                 aria-invalid={!!errors.maxGuestsDefault}
               />
             </Field>
+          </div>
+
+          {/* Venue capacity (aforo) */}
+          <Field
+            label="Aforo del recinto"
+            hint="Capacidad total de invitados. Déjalo vacío si no hay límite."
+            error={errors.capacity}
+          >
+            <Input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={fields.capacity}
+              onChange={(e) => set("capacity", e.target.value)}
+              placeholder="Sin límite"
+              className="h-9"
+              aria-invalid={!!errors.capacity}
+            />
+          </Field>
+
+          {/* Public catalog opt-in */}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3.5 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                Listar en el catálogo público
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Permite que cualquiera vea el evento y se registre desde
+                /eventos. Déjalo apagado para eventos por invitación.
+              </p>
+            </div>
+            <Switch
+              checked={fields.publicListed}
+              onCheckedChange={(v) => set("publicListed", v)}
+            />
           </div>
 
           {/* Email template */}
