@@ -24,6 +24,7 @@ import type {
   GraduateStatus,
   Guest,
   GuestStatus,
+  RegistrationMode,
   ScanEvent,
   ScanResult,
   User,
@@ -421,6 +422,7 @@ export async function createCeremony(
       capacity: data.capacity,
       public_listed: data.publicListed,
       capacity_enforce: data.capacityEnforce,
+      registration_mode: data.registrationMode,
       custom_data: data.customData ?? {},
     })
     .select()
@@ -457,6 +459,8 @@ export async function updateCeremony(
     update.public_listed = patch.publicListed;
   if (patch.capacityEnforce !== undefined)
     update.capacity_enforce = patch.capacityEnforce;
+  if (patch.registrationMode !== undefined)
+    update.registration_mode = patch.registrationMode;
   if (patch.customData !== undefined) update.custom_data = patch.customData;
 
   const { data: row, error } = await supabase
@@ -495,6 +499,7 @@ export interface CreateEventTypeInput {
   invitePhrase: string;
   photoRecommended: boolean;
   defaultTemplate: string;
+  defaultRegistrationMode: RegistrationMode;
   customFields?: CustomFieldDef[];
   sortOrder?: number;
 }
@@ -519,6 +524,7 @@ export async function createEventType(
       invite_phrase: data.invitePhrase,
       photo_recommended: data.photoRecommended,
       default_template: data.defaultTemplate,
+      default_registration_mode: data.defaultRegistrationMode,
       custom_fields: (data.customFields ?? []) as unknown,
       is_builtin: false,
       sort_order: data.sortOrder ?? 200,
@@ -551,6 +557,8 @@ export async function updateEventType(
     update.photo_recommended = patch.photoRecommended;
   if (patch.defaultTemplate !== undefined)
     update.default_template = patch.defaultTemplate;
+  if (patch.defaultRegistrationMode !== undefined)
+    update.default_registration_mode = patch.defaultRegistrationMode;
   if (patch.customFields !== undefined)
     update.custom_fields = patch.customFields as unknown;
   if (patch.active !== undefined) update.active = patch.active;

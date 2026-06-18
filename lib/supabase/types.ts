@@ -66,6 +66,7 @@ export interface Database {
           capacity: number | null;
           public_listed: boolean;
           capacity_enforce: boolean;
+          registration_mode: string | null;
           custom_data: Record<string, unknown>;
           created_at: Timestamp;
           updated_at: Timestamp;
@@ -87,6 +88,7 @@ export interface Database {
           capacity?: number | null;
           public_listed?: boolean;
           capacity_enforce?: boolean;
+          registration_mode?: string | null;
           custom_data?: Record<string, unknown>;
           created_at?: Timestamp;
           updated_at?: Timestamp;
@@ -108,6 +110,7 @@ export interface Database {
           capacity?: number | null;
           public_listed?: boolean;
           capacity_enforce?: boolean;
+          registration_mode?: string | null;
           custom_data?: Record<string, unknown>;
           updated_at?: Timestamp;
         };
@@ -125,6 +128,7 @@ export interface Database {
           invite_phrase: string;
           photo_recommended: boolean;
           default_template: string;
+          default_registration_mode: string;
           custom_fields: unknown;
           is_builtin: boolean;
           active: boolean;
@@ -143,6 +147,7 @@ export interface Database {
           invite_phrase?: string;
           photo_recommended?: boolean;
           default_template?: string;
+          default_registration_mode?: string;
           custom_fields?: unknown;
           is_builtin?: boolean;
           active?: boolean;
@@ -158,6 +163,7 @@ export interface Database {
           invite_phrase?: string;
           photo_recommended?: boolean;
           default_template?: string;
+          default_registration_mode?: string;
           custom_fields?: unknown;
           active?: boolean;
           sort_order?: number;

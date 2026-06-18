@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/table";
 import { EMAIL_TEMPLATES } from "@/lib/email-templates";
 import { EVENT_TYPE_SLUG_RE } from "@/lib/terminology";
-import type { EventTypeRecord } from "@/lib/types";
+import type { EventTypeRecord, RegistrationMode } from "@/lib/types";
 
 interface Props {
   initialTypes: EventTypeRecord[];
@@ -55,6 +55,7 @@ const EMPTY: EventTypeRecord = {
   invitePhrase: "te ha invitado a este evento",
   photoRecommended: false,
   defaultTemplate: "clasica",
+  defaultRegistrationMode: "self_service",
   customFields: [],
   isBuiltin: false,
   active: true,
@@ -232,6 +233,7 @@ function TypeForm({
           invitePhrase: f.invitePhrase.trim(),
           photoRecommended: f.photoRecommended,
           defaultTemplate: f.defaultTemplate,
+          defaultRegistrationMode: f.defaultRegistrationMode,
         };
         const res = await fetch(
           isNew
@@ -315,6 +317,25 @@ function TypeForm({
                 {EMAIL_TEMPLATES.map((t) => (
                   <SelectItem key={t.key} value={t.key}>{t.name}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+          <FieldRow
+            label="Modo de registro recomendado"
+            hint="Predeterminado al crear eventos de este tipo. El admin puede cambiarlo por evento."
+          >
+            <Select
+              value={f.defaultRegistrationMode}
+              onValueChange={(v) =>
+                set("defaultRegistrationMode", (v as RegistrationMode) || "invitation")
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="self_service">Auto-registro</SelectItem>
+                <SelectItem value="invitation">Por invitación</SelectItem>
               </SelectContent>
             </Select>
           </FieldRow>

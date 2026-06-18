@@ -53,6 +53,13 @@ export type EntityType =
   | "scan_event";
 
 /**
+ * How attendees receive their entry QR for an event:
+ *   - "invitation"   → a participant registers guests; guests get the QR (grados).
+ *   - "self_service" → the attendee self-registers and the QR appears in-app.
+ */
+export type RegistrationMode = "invitation" | "self_service";
+
+/**
  * An event. The physical table is still named `ceremonies` (legacy from the
  * graduation-only era); `eventType` + lib/terminology drive the user-facing
  * vocabulary per kind of event.
@@ -79,6 +86,13 @@ export interface Ceremony {
   publicListed: boolean;
   /** At/over capacity: true = block entry, false = warn but admit. */
   capacityEnforce: boolean;
+  /**
+   * How attendees get their QR. `null` = inherit (resolved at runtime via
+   * `effectiveRegistrationMode`: an explicit value wins, else legacy events
+   * fall back to `publicListed`). The event type only *recommends* a default
+   * for new events. See lib/terminology.
+   */
+  registrationMode: RegistrationMode | null;
   /** Answers to the event type's custom fields (keyed by field.key). */
   customData: Record<string, string>;
   createdAt: string;
@@ -97,6 +111,8 @@ export interface EventTypeRecord {
   invitePhrase: string;
   photoRecommended: boolean;
   defaultTemplate: string;
+  /** Recommended registration mode for events of this type. */
+  defaultRegistrationMode: RegistrationMode;
   customFields: import("./terminology").CustomFieldDef[];
   isBuiltin: boolean;
   active: boolean;

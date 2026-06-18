@@ -36,6 +36,10 @@ const Body = z.object({
   invitePhrase: z.string().trim().min(4).max(160),
   photoRecommended: z.boolean(),
   defaultTemplate: z.enum(["clasica", "elegante", "moderna"]),
+  defaultRegistrationMode: z
+    .enum(["invitation", "self_service"])
+    .optional()
+    .default("self_service"),
   customFields: z.array(CustomFieldSchema).max(12).optional(),
 });
 

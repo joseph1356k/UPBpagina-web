@@ -35,6 +35,11 @@ export function ceremonyFromRow(row: Tables["ceremonies"]["Row"]): Ceremony {
     capacity: row.capacity,
     publicListed: row.public_listed,
     capacityEnforce: row.capacity_enforce,
+    registrationMode:
+      row.registration_mode === "self_service" ||
+      row.registration_mode === "invitation"
+        ? row.registration_mode
+        : null,
     customData: (row.custom_data as Record<string, string>) ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -55,6 +60,10 @@ export function eventTypeFromRow(
     invitePhrase: row.invite_phrase,
     photoRecommended: row.photo_recommended,
     defaultTemplate: row.default_template,
+    defaultRegistrationMode:
+      row.default_registration_mode === "self_service"
+        ? "self_service"
+        : "invitation",
     customFields: Array.isArray(row.custom_fields)
       ? (row.custom_fields as import("@/lib/terminology").CustomFieldDef[])
       : [],

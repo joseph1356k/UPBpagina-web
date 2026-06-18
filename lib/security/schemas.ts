@@ -100,6 +100,12 @@ const CeremonyBase = {
   publicListed: z.boolean().optional().default(false),
   // Door capacity policy: true = block at capacity, false = warn but admit.
   capacityEnforce: z.boolean().optional().default(false),
+  // How attendees get their QR. null = inherit (resolved at runtime).
+  registrationMode: z
+    .enum(["invitation", "self_service"])
+    .nullable()
+    .optional()
+    .default(null),
   registrationClosesAt: z.string().min(10).max(40),
   customData: z.record(z.string(), z.string().max(500)).optional().default({}),
 };

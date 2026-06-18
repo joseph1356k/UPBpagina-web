@@ -26,8 +26,13 @@ import { Switch } from "@/components/ui/switch";
 import { adminApi } from "@/lib/api-client";
 import type { CreateCeremonyInput } from "@/lib/data";
 import { EMAIL_TEMPLATES } from "@/lib/email-templates";
-import { EVENT_TYPES } from "@/lib/terminology";
-import type { Ceremony, CeremonyStatus, EventTypeRecord } from "@/lib/types";
+import { EVENT_TYPES, effectiveRegistrationMode } from "@/lib/terminology";
+import type {
+  Ceremony,
+  CeremonyStatus,
+  EventTypeRecord,
+  RegistrationMode,
+} from "@/lib/types";
 
 /* ------------------------------------------------------------------ */
 /*  Types & validation                                                 */
@@ -48,6 +53,7 @@ type Fields = {
   capacity: string;
   capacityEnforce: boolean;
   publicListed: boolean;
+  registrationMode: RegistrationMode;
   registrationClosesAt: string;
 };
 
@@ -161,6 +167,7 @@ const BUILTIN_AS_RECORDS: EventTypeRecord[] = EVENT_TYPES.map((t, i) => ({
   invitePhrase: t.invitePhrase,
   photoRecommended: t.photoRecommended,
   defaultTemplate: t.defaultTemplate,
+  defaultRegistrationMode: t.defaultRegistrationMode,
   customFields: t.customFields ?? [],
   isBuiltin: true,
   active: true,
@@ -196,6 +203,11 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
     capacity: ceremony?.capacity != null ? String(ceremony.capacity) : "",
     capacityEnforce: ceremony?.capacityEnforce ?? false,
     publicListed: ceremony?.publicListed ?? false,
+    // Existing events keep their current effective mode (no surprise flip);
+    // new events start from the selected type's recommendation.
+    registrationMode: ceremony
+      ? effectiveRegistrationMode(ceremony)
+      : typeByValue.get(firstType)?.defaultRegistrationMode ?? "invitation",
     registrationClosesAt: ceremony?.registrationClosesAt
       ? ceremony.registrationClosesAt.slice(0, 16)
       : "",
@@ -219,13 +231,36 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
     setFields((prev) => {
       const prevDefault = typeByValue.get(prev.eventType)?.defaultTemplate;
       const nextDefault = typeByValue.get(next)?.defaultTemplate ?? "clasica";
+      // Same diverge-detection for the registration mode: only follow the new
+      // type's recommendation if the admin hadn't manually changed it.
+      const prevModeDefault =
+        typeByValue.get(prev.eventType)?.defaultRegistrationMode;
+      const nextModeDefault =
+        typeByValue.get(next)?.defaultRegistrationMode ?? "invitation";
+      const registrationMode =
+        prev.registrationMode === prevModeDefault
+          ? nextModeDefault
+          : prev.registrationMode;
       return {
         ...prev,
         eventType: next,
         emailTemplate:
           prev.emailTemplate === prevDefault ? nextDefault : prev.emailTemplate,
+        registrationMode,
+        publicListed:
+          registrationMode === "self_service" ? true : prev.publicListed,
       };
     });
+  }
+
+  /** Switching the mode keeps the public-catalog flag in step: self-service
+   *  events are listed by default; invitation events are not public. */
+  function setRegistrationMode(next: RegistrationMode) {
+    setFields((prev) => ({
+      ...prev,
+      registrationMode: next,
+      publicListed: next === "self_service",
+    }));
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -254,6 +289,7 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
             : null,
           capacityEnforce: fields.capacityEnforce,
           publicListed: fields.publicListed,
+          registrationMode: fields.registrationMode,
           registrationClosesAt: fields.registrationClosesAt
             ? new Date(fields.registrationClosesAt).toISOString()
             : new Date(`${fields.date}T23:59:59`).toISOString(),
@@ -327,6 +363,31 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
                     {t.label}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {/* Registration mode (recommended by the event type) */}
+          <Field
+            label="¿Cómo reciben el QR los asistentes?"
+            hint={
+              fields.registrationMode === "self_service"
+                ? "Auto-registro: la persona se registra y su QR aparece al instante. No requiere invitar a nadie."
+                : "Por invitación: un responsable registra a los invitados y a cada uno le llega su QR."
+            }
+          >
+            <Select
+              value={fields.registrationMode}
+              onValueChange={(v) =>
+                setRegistrationMode((v as RegistrationMode) || "invitation")
+              }
+            >
+              <SelectTrigger className="h-9 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="self_service">Auto-registro</SelectItem>
+                <SelectItem value="invitation">Por invitación</SelectItem>
               </SelectContent>
             </Select>
           </Field>
@@ -504,8 +565,8 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
                 Listar en el catálogo público
               </p>
               <p className="text-xs text-muted-foreground">
-                Permite que cualquiera vea el evento y se registre desde
-                /eventos. Déjalo apagado para eventos por invitación.
+                Muestra el evento en el catálogo público /eventos. El registro
+                lo define el modo de arriba.
               </p>
             </div>
             <Switch

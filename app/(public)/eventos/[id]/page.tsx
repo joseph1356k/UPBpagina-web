@@ -8,7 +8,7 @@ import { RsvpForm } from "@/components/public/rsvp-form";
 import { getCeremony } from "@/lib/data";
 import { ROUTES } from "@/lib/constants";
 import { formatDateLong, formatNumber, formatTime } from "@/lib/format";
-import { cap, getTerminology } from "@/lib/terminology";
+import { cap, effectiveRegistrationMode, getTerminology } from "@/lib/terminology";
 
 export async function generateMetadata({
   params,
@@ -19,7 +19,7 @@ export async function generateMetadata({
   const event = await getCeremony(id);
   return {
     title:
-      event && event.publicListed
+      event && effectiveRegistrationMode(event) === "self_service"
         ? `${event.name} — UPB`
         : "Evento no encontrado",
   };
@@ -32,8 +32,9 @@ export default async function EventoDetallePage({
 }) {
   const { id } = await params;
   const event = await getCeremony(id);
-  // Only publicly-listed events are reachable here.
-  if (!event || !event.publicListed) notFound();
+  // Reachable for self-registration events (catalog-listed or link-only).
+  // Invitation events have no public RSVP page.
+  if (!event || effectiveRegistrationMode(event) !== "self_service") notFound();
 
   const term = getTerminology(event.eventType);
   const open = event.status === "open";

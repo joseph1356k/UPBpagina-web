@@ -397,6 +397,7 @@ export async function getEventTypes(
     invitePhrase: t.invitePhrase,
     photoRecommended: t.photoRecommended,
     defaultTemplate: t.defaultTemplate,
+    defaultRegistrationMode: t.defaultRegistrationMode,
     customFields: t.customFields ?? [],
     isBuiltin: true,
     active: true,
@@ -590,7 +591,11 @@ export async function registerAttendee(
   await delay();
   const cer = ceremoniesSeed.find((c) => c.id === ceremonyId);
   if (!cer) return { ok: false, error: "not_found" };
-  if (!cer.publicListed) return { ok: false, error: "not_public" };
+  // Effective mode mirrors lib/terminology.effectiveRegistrationMode: an
+  // explicit mode wins, else legacy events fall back to publicListed.
+  const mode =
+    cer.registrationMode ?? (cer.publicListed ? "self_service" : "invitation");
+  if (mode !== "self_service") return { ok: false, error: "not_public" };
   if (
     cer.status !== "open" ||
     new Date(cer.registrationClosesAt).getTime() < Date.now()
