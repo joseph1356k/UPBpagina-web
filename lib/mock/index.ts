@@ -652,6 +652,8 @@ export async function registerAttendee(
 export interface SimulatedScanResult {
   result: ScanResult;
   reason: ScanDeniedReason | null;
+  /** Non-blocking warning (e.g. admitted while over capacity). */
+  warning?: ScanDeniedReason | null;
   guest: Guest | null;
   graduate: Graduate | null;
   ceremonyName: string | null;

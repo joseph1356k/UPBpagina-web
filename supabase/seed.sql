@@ -6,30 +6,30 @@
 
 -- ─── Events (table is still named `ceremonies`; event_type drives the UX) ──
 INSERT INTO public.ceremonies
-  (id, name, event_type, email_template, date, start_time, end_time, venue, campus, faculty, status, registration_closes_at, max_guests_default, capacity, public_listed)
+  (id, name, event_type, email_template, date, start_time, end_time, venue, campus, faculty, status, registration_closes_at, max_guests_default, capacity, public_listed, capacity_enforce)
 VALUES
   ('cer_ing_06_2026', 'Grados Facultad de Ingenierías — Junio 2026', 'graduation', 'elegante',
    '2026-06-19', '09:00', '11:30',
    'Auditorio Mons. Felipe Estrada Vélez', 'Medellín',
    'Facultad de Ingenierías', 'open',
-   '2026-06-12 23:59:59-05', 4, 320, false),
+   '2026-06-12 23:59:59-05', 4, 320, false, false),
 
   ('cer_eco_06_2026', 'Grados Facultad de Ciencias Económicas — Junio 2026', 'graduation', 'elegante',
    '2026-06-26', '10:00', '12:30',
    'Auditorio Principal UPB Bucaramanga', 'Bucaramanga',
    'Facultad de Ciencias Económicas, Administrativas y Contables', 'open',
-   '2026-06-19 23:59:59-05', 3, 250, false),
+   '2026-06-19 23:59:59-05', 3, 250, false, false),
 
   ('cer_sal_04_2026', 'Grados Facultad de Ciencias de la Salud — Abril 2026', 'graduation', 'elegante',
    '2026-04-18', '08:30', '11:00',
    'Auditorio Mons. Felipe Estrada Vélez', 'Medellín',
    'Facultad de Ciencias de la Salud', 'completed',
-   '2026-04-11 23:59:59-05', 4, 300, false),
+   '2026-04-11 23:59:59-05', 4, 300, false, false),
 
   ('cer_conf_09_2026', 'Congreso de Innovación UPB 2026', 'conference', 'clasica',
    '2026-09-10', '08:00', '17:00',
    'Centro de Convenciones', 'Medellín', 'Vicerrectoría', 'open',
-   '2026-09-05 23:59:59-05', 2, 500, true);
+   '2026-09-05 23:59:59-05', 2, 500, true, false);
 
 -- ─── Demo graduates (3 per ceremony — just enough to see the UI) ───────────
 INSERT INTO public.graduates

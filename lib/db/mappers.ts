@@ -34,6 +34,7 @@ export function ceremonyFromRow(row: Tables["ceremonies"]["Row"]): Ceremony {
     maxGuestsDefault: row.max_guests_default,
     capacity: row.capacity,
     publicListed: row.public_listed,
+    capacityEnforce: row.capacity_enforce,
     customData: (row.custom_data as Record<string, string>) ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,

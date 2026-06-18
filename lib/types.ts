@@ -32,7 +32,8 @@ export type ScanDeniedReason =
   | "wrong_ceremony"
   | "outside_time_window"
   | "revoked"
-  | "not_found";
+  | "not_found"
+  | "capacity_full";
 
 export type AuditAction =
   | "create"
@@ -76,6 +77,8 @@ export interface Ceremony {
   capacity: number | null;
   /** Whether this event appears in the public catalog (/eventos). */
   publicListed: boolean;
+  /** At/over capacity: true = block entry, false = warn but admit. */
+  capacityEnforce: boolean;
   /** Answers to the event type's custom fields (keyed by field.key). */
   customData: Record<string, string>;
   createdAt: string;

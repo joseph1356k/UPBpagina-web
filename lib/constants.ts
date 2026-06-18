@@ -128,6 +128,7 @@ export const SCAN_DENIED_REASON_LABEL: Record<ScanDeniedReason, string> = {
   outside_time_window: "Fuera de horario",
   revoked: "Invitación revocada",
   not_found: "QR no encontrado",
+  capacity_full: "Aforo lleno",
 };
 
 /* ------------------------------------------------------------------ */

@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       result: r.result,
       reason: r.reason,
+      warning: r.warning ?? null,
       guestName: r.guest?.fullName ?? null,
       guestDocument: r.guest?.documentNumber ?? null,
       graduateName: r.graduate?.fullName ?? null,

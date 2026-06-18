@@ -98,6 +98,8 @@ const CeremonyBase = {
   capacity: z.number().int().positive().max(100000).nullable().default(null),
   // Public catalog opt-in. Lenient input, defined output.
   publicListed: z.boolean().optional().default(false),
+  // Door capacity policy: true = block at capacity, false = warn but admit.
+  capacityEnforce: z.boolean().optional().default(false),
   registrationClosesAt: z.string().min(10).max(40),
   customData: z.record(z.string(), z.string().max(500)).optional().default({}),
 };

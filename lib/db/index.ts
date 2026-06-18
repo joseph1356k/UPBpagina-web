@@ -420,6 +420,7 @@ export async function createCeremony(
       max_guests_default: data.maxGuestsDefault,
       capacity: data.capacity,
       public_listed: data.publicListed,
+      capacity_enforce: data.capacityEnforce,
       custom_data: data.customData ?? {},
     })
     .select()
@@ -454,6 +455,8 @@ export async function updateCeremony(
   if (patch.capacity !== undefined) update.capacity = patch.capacity;
   if (patch.publicListed !== undefined)
     update.public_listed = patch.publicListed;
+  if (patch.capacityEnforce !== undefined)
+    update.capacity_enforce = patch.capacityEnforce;
   if (patch.customData !== undefined) update.custom_data = patch.customData;
 
   const { data: row, error } = await supabase
@@ -902,6 +905,8 @@ import type { ScanDeniedReason } from "@/lib/types";
 export interface SimulatedScanResult {
   result: ScanResult;
   reason: ScanDeniedReason | null;
+  /** Non-blocking warning (e.g. admitted while over capacity). */
+  warning?: ScanDeniedReason | null;
   guest: Guest | null;
   graduate: Graduate | null;
   ceremonyName: string | null;
@@ -913,6 +918,7 @@ interface QrValidateRpc {
   reason: ScanDeniedReason | null;
   guestName: string | null;
   graduateId: string | null;
+  warning?: ScanDeniedReason | null;
 }
 
 /**
@@ -974,6 +980,7 @@ export async function simulateScan(args: {
   return {
     result: rpc.result,
     reason: rpc.reason,
+    warning: rpc.warning ?? null,
     guest,
     graduate,
     ceremonyName: ceremony?.name ?? null,
@@ -1098,6 +1105,7 @@ export async function manualCheckIn(args: {
   return {
     result: rpc.result,
     reason: rpc.reason,
+    warning: rpc.warning ?? null,
     guest,
     graduate,
     ceremonyName: ceremony?.name ?? null,

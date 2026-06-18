@@ -55,6 +55,8 @@ interface Props {
 interface ScanOutcome {
   result: "allowed" | "denied" | "queued";
   reason: ScanDeniedReason | null;
+  /** Non-blocking warning (e.g. admitted while over capacity). */
+  warning?: ScanDeniedReason | null;
   guestName: string | null;
   guestDocument: string | null;
   graduateName: string | null;
@@ -122,6 +124,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
           finishScan({
             result: r.result === "allowed" ? "allowed" : "denied",
             reason: r.reason,
+            warning: r.warning ?? null,
             guestName: r.guest?.fullName ?? null,
             guestDocument: r.guest?.documentNumber ?? null,
             graduateName: r.graduate?.fullName ?? null,
@@ -165,6 +168,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
         const json = (await res.json().catch(() => ({}))) as {
           result?: "allowed" | "denied";
           reason?: ScanDeniedReason | null;
+          warning?: ScanDeniedReason | null;
           guestName?: string | null;
           graduateId?: string | null;
           error?: string;
@@ -185,6 +189,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
         finishScan({
           result: json.result,
           reason: json.reason ?? null,
+          warning: json.warning ?? null,
           guestName: json.guestName ?? null,
           guestDocument: null,
           graduateName: null,
@@ -333,6 +338,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
           finishScan({
             result: r.result === "allowed" ? "allowed" : "denied",
             reason: r.reason,
+            warning: r.warning ?? null,
             guestName: r.guest?.fullName ?? null,
             guestDocument: r.guest?.documentNumber ?? null,
             graduateName: r.graduate?.fullName ?? null,
@@ -350,6 +356,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
         const json = (await res.json().catch(() => ({}))) as {
           result?: "allowed" | "denied";
           reason?: ScanDeniedReason | null;
+          warning?: ScanDeniedReason | null;
           guestName?: string | null;
           guestDocument?: string | null;
           graduateName?: string | null;
@@ -369,6 +376,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
         finishScan({
           result: json.result,
           reason: json.reason ?? null,
+          warning: json.warning ?? null,
           guestName: json.guestName ?? null,
           guestDocument: json.guestDocument ?? null,
           graduateName: json.graduateName ?? null,
@@ -839,6 +847,13 @@ function ScanResultCard({
           )}
         </div>
       </div>
+
+      {data.warning === "capacity_full" && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+          <AlertTriangle className="size-4 shrink-0" />
+          Aforo superado — ingreso permitido por excepción.
+        </div>
+      )}
 
       {/* Guest info */}
       {guestName ? (

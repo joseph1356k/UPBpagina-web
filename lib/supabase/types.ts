@@ -42,7 +42,8 @@ export type ScanDeniedReasonDb =
   | "wrong_ceremony"
   | "outside_time_window"
   | "revoked"
-  | "not_found";
+  | "not_found"
+  | "capacity_full";
 
 export interface Database {
   public: {
@@ -64,6 +65,7 @@ export interface Database {
           max_guests_default: number;
           capacity: number | null;
           public_listed: boolean;
+          capacity_enforce: boolean;
           custom_data: Record<string, unknown>;
           created_at: Timestamp;
           updated_at: Timestamp;
@@ -84,6 +86,7 @@ export interface Database {
           max_guests_default?: number;
           capacity?: number | null;
           public_listed?: boolean;
+          capacity_enforce?: boolean;
           custom_data?: Record<string, unknown>;
           created_at?: Timestamp;
           updated_at?: Timestamp;
@@ -104,6 +107,7 @@ export interface Database {
           max_guests_default?: number;
           capacity?: number | null;
           public_listed?: boolean;
+          capacity_enforce?: boolean;
           custom_data?: Record<string, unknown>;
           updated_at?: Timestamp;
         };

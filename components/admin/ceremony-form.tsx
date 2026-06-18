@@ -46,6 +46,7 @@ type Fields = {
   status: CeremonyStatus;
   maxGuestsDefault: string;
   capacity: string;
+  capacityEnforce: boolean;
   publicListed: boolean;
   registrationClosesAt: string;
 };
@@ -193,6 +194,7 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
     status: ceremony?.status ?? "draft",
     maxGuestsDefault: String(ceremony?.maxGuestsDefault ?? "4"),
     capacity: ceremony?.capacity != null ? String(ceremony.capacity) : "",
+    capacityEnforce: ceremony?.capacityEnforce ?? false,
     publicListed: ceremony?.publicListed ?? false,
     registrationClosesAt: ceremony?.registrationClosesAt
       ? ceremony.registrationClosesAt.slice(0, 16)
@@ -250,6 +252,7 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
           capacity: fields.capacity.trim()
             ? parseInt(fields.capacity, 10)
             : null,
+          capacityEnforce: fields.capacityEnforce,
           publicListed: fields.publicListed,
           registrationClosesAt: fields.registrationClosesAt
             ? new Date(fields.registrationClosesAt).toISOString()
@@ -476,6 +479,23 @@ function CeremonyFormContents({ ceremony, eventTypes, onClose, onSave }: InnerPr
               aria-invalid={!!errors.capacity}
             />
           </Field>
+
+          {/* Door capacity policy */}
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3.5 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                Bloquear ingreso al llenar el aforo
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Apagado: al superar el aforo se permite el ingreso con una
+                advertencia. Solo aplica si definiste un aforo.
+              </p>
+            </div>
+            <Switch
+              checked={fields.capacityEnforce}
+              onCheckedChange={(v) => set("capacityEnforce", v)}
+            />
+          </div>
 
           {/* Public catalog opt-in */}
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3.5 py-3">
