@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { formatInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import type { UserRole } from "@/lib/types";
 import { ADMIN_NAV, type AdminNavItem } from "./nav-items";
 
 export interface AdminSidebarUser {
@@ -26,6 +27,17 @@ interface AdminSidebarProps {
 }
 
 export function AdminSidebar({ className, onNavigate, user }: AdminSidebarProps) {
+  const role = user?.role;
+  // Scope the nav: items with a `roles` list are only shown to those roles
+  // (e.g. organizers don't see Usuarios / Configuración / Importar).
+  const navGroups = ADMIN_NAV.map((group) => ({
+    ...group,
+    items: group.items.filter(
+      (item) =>
+        !item.roles || (role != null && item.roles.includes(role as UserRole)),
+    ),
+  })).filter((group) => group.items.length > 0);
+
   return (
     <aside
       className={cn(
@@ -43,7 +55,7 @@ export function AdminSidebar({ className, onNavigate, user }: AdminSidebarProps)
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {ADMIN_NAV.map((group, idx) => (
+        {navGroups.map((group, idx) => (
           <div key={group.label} className={cn(idx > 0 && "mt-5")}>
             <p className="px-3 pb-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground/80">
               {group.label}
@@ -111,6 +123,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin: "Administrador",
   coordinator: "Coordinador",
   scanner: "Operador de escáner",
+  organizer: "Organizador",
 };
 
 function UserChip({ user }: { user?: AdminSidebarUser | null }) {

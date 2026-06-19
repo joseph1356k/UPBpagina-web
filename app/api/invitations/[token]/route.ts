@@ -22,7 +22,7 @@ export async function GET(
   }
 
   // Rate-limit anonymous token lookups to deter token-enumeration scans
-  const rl = rateLimit(request, "invitation-lookup", { max: 30, windowMs: 60_000 });
+  const rl = await rateLimit(request, "invitation-lookup", { max: 30, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
 
   const { token } = await params;

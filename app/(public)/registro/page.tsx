@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BrandMark } from "@/components/shared/brand-mark";
+import { Turnstile } from "@/components/security/turnstile";
 import { DOCUMENT_TYPE_LABEL, ROUTES } from "@/lib/constants";
 import { USE_SUPABASE } from "@/lib/supabase/env";
 import { getGraduateByDocument } from "@/lib/mock";
@@ -34,6 +35,7 @@ type FormError =
   | "not_found"
   | "not_eligible"
   | "rate_limit"
+  | "captcha"
   | "unknown";
 
 const ERROR_COPY: Record<FormError, { title: string; body: string }> = {
@@ -57,6 +59,10 @@ const ERROR_COPY: Record<FormError, { title: string; body: string }> = {
     title: "Demasiados intentos",
     body: "Por seguridad, el acceso ha sido bloqueado temporalmente. Espera 10 minutos e inténtalo de nuevo.",
   },
+  captcha: {
+    title: "Verificación de seguridad fallida",
+    body: "No pudimos confirmar que eres una persona. Espera un momento e inténtalo de nuevo.",
+  },
   unknown: {
     title: "Error inesperado",
     body: "Ocurrió un problema al procesar tu solicitud. Intenta de nuevo.",
@@ -75,6 +81,15 @@ export default function RegistroPage() {
   const [docNumber, setDocNumber] = useState("");
   const [attempts, setAttempts] = useState(0);
   const [error, setError] = useState<FormError | null>(null);
+  // Turnstile token ("skip" when Turnstile is disabled). nonce forces a fresh
+  // challenge after a failed attempt (tokens are single-use).
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaNonce, setCaptchaNonce] = useState(0);
+
+  function resetCaptcha() {
+    setCaptchaToken("");
+    setCaptchaNonce((n) => n + 1);
+  }
 
   function handleDocNumberChange(e: React.ChangeEvent<HTMLInputElement>) {
     // Strip non-digits while the user types
@@ -110,18 +125,27 @@ export default function RegistroPage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             credentials: "same-origin",
-            body: JSON.stringify({ documentNumber: docNumber }),
+            body: JSON.stringify({
+              documentNumber: docNumber,
+              captchaToken,
+            }),
           });
           const json = await res.json().catch(() => ({}));
 
           if (!res.ok || json.ok === false) {
             const err = (json.error ?? "unknown") as string;
-            if (err === "not_found" || err === "not_eligible" || err === "rate_limit") {
+            if (
+              err === "not_found" ||
+              err === "not_eligible" ||
+              err === "rate_limit" ||
+              err === "captcha"
+            ) {
               setError(err);
             } else {
               setError("unknown");
             }
             setAttempts((n) => n + 1);
+            resetCaptcha(); // token is single-use — get a fresh one
             return;
           }
 
@@ -237,11 +261,18 @@ export default function RegistroPage() {
               </div>
             )}
 
+            {/* Security check (renders nothing if Turnstile is disabled) */}
+            <Turnstile
+              onToken={setCaptchaToken}
+              action="send-otp"
+              resetKey={captchaNonce}
+            />
+
             {/* Submit */}
             <Button
               type="submit"
               className="w-full h-10"
-              disabled={isPending}
+              disabled={isPending || !captchaToken}
             >
               {isPending ? (
                 <>

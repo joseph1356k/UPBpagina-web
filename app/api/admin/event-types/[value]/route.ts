@@ -33,6 +33,7 @@ const Body = z.object({
   invitePhrase: z.string().trim().min(4).max(160).optional(),
   photoRecommended: z.boolean().optional(),
   defaultTemplate: z.enum(["clasica", "elegante", "moderna"]).optional(),
+  defaultRegistrationMode: z.enum(["invitation", "self_service"]).optional(),
   customFields: z.array(CustomFieldSchema).max(12).optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().min(0).max(9999).optional(),
@@ -45,7 +46,7 @@ export async function PATCH(
   if (!USE_SUPABASE) {
     return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
-  const rl = rateLimit(request, "admin-event-types", { max: 30, windowMs: 60_000 });
+  const rl = await rateLimit(request, "admin-event-types", { max: 30, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
   const csrf = assertSameOrigin(request);
   if (!csrf.ok) return csrf.response;

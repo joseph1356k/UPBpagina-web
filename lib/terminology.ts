@@ -17,6 +17,8 @@
  * needed (the column is app-validated text).
  */
 
+import type { RegistrationMode } from "./types";
+
 export type EventType =
   | "graduation"
   | "institutional"
@@ -64,6 +66,8 @@ export interface EventTerminology {
   photoRecommended: boolean;
   /** Suggested email template key (admin can override per event). */
   defaultTemplate: "clasica" | "elegante" | "moderna";
+  /** Recommended registration mode for new events of this type. */
+  defaultRegistrationMode: RegistrationMode;
   /** Per-type custom fields (empty for built-ins until an admin adds some). */
   customFields?: CustomFieldDef[];
 }
@@ -71,6 +75,7 @@ export interface EventTerminology {
 export const EVENT_TYPES: readonly EventTerminology[] = [
   {
     value: "graduation",
+    defaultRegistrationMode: "invitation",
     label: "Ceremonia de grado",
     eventNoun: "ceremonia",
     participantSingular: "graduando",
@@ -83,6 +88,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "institutional",
+    defaultRegistrationMode: "self_service",
     label: "Evento institucional",
     eventNoun: "evento",
     participantSingular: "anfitrión",
@@ -95,6 +101,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "private",
+    defaultRegistrationMode: "invitation",
     label: "Evento privado",
     eventNoun: "evento",
     participantSingular: "anfitrión",
@@ -107,6 +114,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "sports",
+    defaultRegistrationMode: "self_service",
     label: "Evento deportivo",
     eventNoun: "evento",
     participantSingular: "participante",
@@ -119,6 +127,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "catering",
+    defaultRegistrationMode: "invitation",
     label: "Evento de catering",
     eventNoun: "evento",
     participantSingular: "anfitrión",
@@ -131,6 +140,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "investors",
+    defaultRegistrationMode: "self_service",
     label: "Reunión con inversionistas",
     eventNoun: "reunión",
     participantSingular: "anfitrión",
@@ -143,6 +153,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "conference",
+    defaultRegistrationMode: "self_service",
     label: "Conferencia",
     eventNoun: "conferencia",
     participantSingular: "organizador",
@@ -155,6 +166,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "talk",
+    defaultRegistrationMode: "self_service",
     label: "Charla",
     eventNoun: "charla",
     participantSingular: "organizador",
@@ -167,6 +179,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "workshop",
+    defaultRegistrationMode: "self_service",
     label: "Taller",
     eventNoun: "taller",
     participantSingular: "organizador",
@@ -179,6 +192,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "seminar",
+    defaultRegistrationMode: "self_service",
     label: "Seminario",
     eventNoun: "seminario",
     participantSingular: "organizador",
@@ -191,6 +205,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "fair",
+    defaultRegistrationMode: "self_service",
     label: "Feria",
     eventNoun: "feria",
     participantSingular: "expositor",
@@ -203,6 +218,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "business",
+    defaultRegistrationMode: "self_service",
     label: "Reunión empresarial",
     eventNoun: "reunión",
     participantSingular: "anfitrión",
@@ -215,6 +231,7 @@ export const EVENT_TYPES: readonly EventTerminology[] = [
   },
   {
     value: "other",
+    defaultRegistrationMode: "self_service",
     label: "Otro",
     eventNoun: "evento",
     participantSingular: "participante",
@@ -260,6 +277,7 @@ export interface EventTypeRow {
   invite_phrase: string;
   photo_recommended: boolean;
   default_template: string;
+  default_registration_mode?: string;
   custom_fields?: unknown;
   active?: boolean;
   sort_order?: number;
@@ -283,6 +301,10 @@ export function terminologyFromRow(row: EventTypeRow): EventTerminology {
     )
       ? row.default_template
       : "clasica") as EventTerminology["defaultTemplate"],
+    defaultRegistrationMode:
+      row.default_registration_mode === "self_service"
+        ? "self_service"
+        : "invitation",
     customFields: Array.isArray(row.custom_fields)
       ? (row.custom_fields as CustomFieldDef[])
       : [],
@@ -295,4 +317,21 @@ export const EVENT_TYPE_SLUG_RE = /^[a-z][a-z0-9_-]{1,39}$/;
 /** Capitalize the first letter (labels arrive lowercase by design). */
 export function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Resolve how an event actually delivers its QR.
+ *
+ * An explicit `registrationMode` always wins. When it's null (legacy events
+ * never touched since this feature shipped), we fall back to the historical
+ * behaviour — `publicListed` was the de-facto self-registration switch — so
+ * no existing event changes how it works. The event type's *recommendation*
+ * is intentionally NOT consulted here; it only pre-fills the form for new
+ * events (see ceremony-form).
+ */
+export function effectiveRegistrationMode(c: {
+  registrationMode: RegistrationMode | null;
+  publicListed: boolean;
+}): RegistrationMode {
+  return c.registrationMode ?? (c.publicListed ? "self_service" : "invitation");
 }

@@ -32,7 +32,8 @@ export type ScanDeniedReason =
   | "wrong_ceremony"
   | "outside_time_window"
   | "revoked"
-  | "not_found";
+  | "not_found"
+  | "capacity_full";
 
 export type AuditAction =
   | "create"
@@ -50,6 +51,13 @@ export type EntityType =
   | "guest"
   | "user"
   | "scan_event";
+
+/**
+ * How attendees receive their entry QR for an event:
+ *   - "invitation"   → a participant registers guests; guests get the QR (grados).
+ *   - "self_service" → the attendee self-registers and the QR appears in-app.
+ */
+export type RegistrationMode = "invitation" | "self_service";
 
 /**
  * An event. The physical table is still named `ceremonies` (legacy from the
@@ -72,6 +80,19 @@ export interface Ceremony {
   status: CeremonyStatus;
   registrationClosesAt: string; // ISO datetime
   maxGuestsDefault: number;
+  /** Venue capacity — total guests allowed in. null = no limit. */
+  capacity: number | null;
+  /** Whether this event appears in the public catalog (/eventos). */
+  publicListed: boolean;
+  /** At/over capacity: true = block entry, false = warn but admit. */
+  capacityEnforce: boolean;
+  /**
+   * How attendees get their QR. `null` = inherit (resolved at runtime via
+   * `effectiveRegistrationMode`: an explicit value wins, else legacy events
+   * fall back to `publicListed`). The event type only *recommends* a default
+   * for new events. See lib/terminology.
+   */
+  registrationMode: RegistrationMode | null;
   /** Answers to the event type's custom fields (keyed by field.key). */
   customData: Record<string, string>;
   createdAt: string;
@@ -90,6 +111,8 @@ export interface EventTypeRecord {
   invitePhrase: string;
   photoRecommended: boolean;
   defaultTemplate: string;
+  /** Recommended registration mode for events of this type. */
+  defaultRegistrationMode: RegistrationMode;
   customFields: import("./terminology").CustomFieldDef[];
   isBuiltin: boolean;
   active: boolean;
@@ -117,7 +140,10 @@ export interface Graduate {
 
 export interface Guest {
   id: string;
-  graduateId: string;
+  /** Participant who registered this guest. null = self-registered attendee. */
+  graduateId: string | null;
+  /** Event this guest belongs to directly (self-reg). null = resolved via graduate. */
+  ceremonyId: string | null;
   fullName: string;
   documentNumber: string | null;
   email: string | null;
@@ -171,6 +197,8 @@ export interface AuditEntry {
  */
 export interface CeremonyStats {
   ceremonyId: string;
+  /** Venue capacity (null = no limit). Mirrors Ceremony.capacity. */
+  capacity: number | null;
   graduatesCount: number;
   graduatesRegistered: number;
   guestsCount: number;

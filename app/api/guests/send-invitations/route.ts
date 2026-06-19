@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. Rate limit (5/min — guards against bulk email abuse)
-  const rl = rateLimit(request, "send-invitations", { max: 5, windowMs: 60_000 });
+  const rl = await rateLimit(request, "send-invitations", { max: 5, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
 
   // 2. CSRF

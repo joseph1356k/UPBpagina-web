@@ -22,6 +22,7 @@ import { USE_SUPABASE } from "@/lib/supabase/env";
 import { otpEmailTemplate, sendEmail } from "@/lib/email";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { assertSameOrigin } from "@/lib/security/csrf";
+import { verifyTurnstile } from "@/lib/security/captcha";
 import { parseJson, SendOtpBody } from "@/lib/security/schemas";
 
 export async function POST(request: NextRequest) {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. IP-based rate limit (10 per minute per IP)
-  const rl = rateLimit(request, "send-otp", { max: 10, windowMs: 60_000 });
+  const rl = await rateLimit(request, "send-otp", { max: 10, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
 
   // 2. CSRF
@@ -45,10 +46,20 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
   }
-  const { documentNumber } = parsed.data;
+  const { documentNumber, captchaToken } = parsed.data;
 
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+
+  // 3b. CAPTCHA (no-op unless Turnstile is configured) — stops bots before
+  //     we touch the DB or reveal whether a document exists.
+  const captcha = await verifyTurnstile(captchaToken, ip);
+  if (!captcha.ok) {
+    return NextResponse.json(
+      { ok: false, error: "captcha" },
+      { status: 400 },
+    );
+  }
 
   // 4. DB-level rate limit + OTP generation (atomic)
   const supabase = createServiceClient();

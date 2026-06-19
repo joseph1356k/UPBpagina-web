@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 1. IP rate limit (20/min — generous; user retries are common)
-  const rl = rateLimit(request, "verify-otp", { max: 20, windowMs: 60_000 });
+  const rl = await rateLimit(request, "verify-otp", { max: 20, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
 
   // 2. CSRF

@@ -8,6 +8,7 @@ import {
   Users,
   GraduationCap,
   QrCode,
+  Radio,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -23,10 +24,15 @@ import {
 } from "@/components/ui/table";
 import { CeremonyStatusBadge, GraduateStatusBadge } from "@/components/shared/status-badge";
 import { StatCard } from "@/components/shared/stat-card";
+import { LiveAttendance } from "@/components/admin/live-attendance";
+import { EventOrganizers } from "@/components/admin/event-organizers";
+import { getCurrentStaff } from "@/lib/security/staff-auth";
 import {
   getCeremony,
   getCeremonyStats,
+  getEventOrganizerIds,
   getGraduates,
+  getUsers,
 } from "@/lib/data";
 import { ROUTES } from "@/lib/constants";
 import {
@@ -65,6 +71,22 @@ export default async function CeremonyDetailPage({
   if (!ceremony) notFound();
 
   const stats = await getCeremonyStats(id);
+
+  const staff = await getCurrentStaff();
+  const canManageOrganizers = staff?.role === "admin";
+  let organizerIds: string[] = [];
+  let assignableOrganizers: { id: string; fullName: string; email: string }[] =
+    [];
+  if (canManageOrganizers) {
+    const [ids, users] = await Promise.all([
+      getEventOrganizerIds(id),
+      getUsers(),
+    ]);
+    organizerIds = ids;
+    assignableOrganizers = users
+      .filter((u) => u.role === "organizer" && u.active)
+      .map((u) => ({ id: u.id, fullName: u.fullName, email: u.email }));
+  }
 
   const registrationPct = stats.graduatesCount
     ? Math.round((stats.graduatesRegistered / stats.graduatesCount) * 100)
@@ -106,10 +128,24 @@ export default async function CeremonyDetailPage({
             </span>
           </div>
         </div>
-        <div className="mt-2 sm:mt-0 shrink-0">
+        <div className="mt-2 flex items-center gap-2 sm:mt-0 shrink-0">
           <CeremonyStatusBadge status={ceremony.status} showDot />
+          <Button asChild variant="outline" size="sm">
+            <Link href={`${ROUTES.adminCeremonias}/${ceremony.id}/monitor`}>
+              <Radio className="size-3.5" />
+              Tablero en vivo
+            </Link>
+          </Button>
         </div>
       </div>
+
+      {/* Live occupancy (realtime in Supabase mode) */}
+      <LiveAttendance
+        variant="compact"
+        ceremonyId={ceremony.id}
+        ceremonyName={ceremony.name}
+        initial={stats}
+      />
 
       {/* Stats */}
       <section
@@ -160,6 +196,14 @@ export default async function CeremonyDetailPage({
             <Row label="Lugar" value={ceremony.venue} />
             <Row label="Cupos por defecto" value={String(ceremony.maxGuestsDefault)} />
             <Row
+              label="Aforo del recinto"
+              value={
+                ceremony.capacity != null
+                  ? formatNumber(ceremony.capacity)
+                  : "Sin límite"
+              }
+            />
+            <Row
               label="Cierre de registro"
               value={formatDateLong(ceremony.registrationClosesAt)}
             />
@@ -190,6 +234,14 @@ export default async function CeremonyDetailPage({
           </CardContent>
         </Card>
       </section>
+
+      {canManageOrganizers && (
+        <EventOrganizers
+          ceremonyId={ceremony.id}
+          initialOrganizerIds={organizerIds}
+          users={assignableOrganizers}
+        />
+      )}
 
       {/* Graduates table */}
       <section>

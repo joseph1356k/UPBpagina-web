@@ -20,7 +20,9 @@ import {
   SCAN_DENIED_REASON_LABEL,
   SCAN_RESULT_LABEL,
 } from "@/lib/constants";
-import { formatDateTime, formatDateShort } from "@/lib/format";
+import { formatDateTime, formatDateShort, formatNumber } from "@/lib/format";
+import { BarList } from "@/components/shared/charts/bar-list";
+import { DonutStat } from "@/components/shared/charts/donut-stat";
 import type { Ceremony, Graduate } from "@/lib/types";
 import type { GuestAdminRow, ScanEventRow } from "@/lib/data";
 
@@ -68,6 +70,30 @@ export function ReportsPanel({
   function ceremonyMatches(cId: string): boolean {
     return !ceremonyId || cId === ceremonyId;
   }
+
+  /* ── Visual summary (respects the ceremony filter) ───────────────── */
+  const summaryGuests = guests.filter((g) => ceremonyMatches(g.ceremonyId));
+  const summaryGraduates = graduates.filter((g) =>
+    ceremonyMatches(g.ceremonyId),
+  );
+  const selectedName = ceremonyId
+    ? ceremonies.find((c) => c.id === ceremonyId)?.name ?? null
+    : null;
+  // ScanEventRow carries ceremonyName (not id); match the CSV export's approach.
+  const summaryScans = selectedName
+    ? scans.filter((s) => s.ceremonyName === selectedName)
+    : scans;
+  const sumRegistered = summaryGraduates.filter(
+    (g) => g.status === "registered" || g.status === "completed",
+  ).length;
+  const sumInvited = summaryGuests.filter(
+    (g) => g.status === "invited" || g.status === "checked_in",
+  ).length;
+  const sumCheckedIn = summaryGuests.filter(
+    (g) => g.status === "checked_in",
+  ).length;
+  const sumAllowed = summaryScans.filter((s) => s.result === "allowed").length;
+  const sumDenied = summaryScans.filter((s) => s.result === "denied").length;
 
   function exportReport(key: ReportKey) {
     startTransition(async () => {
@@ -178,7 +204,11 @@ export function ReportsPanel({
         const rows = filteredCer.map((c) => {
           const cg = graduates.filter((g) => g.ceremonyId === c.id);
           const gids = new Set(cg.map((g) => g.id));
-          const cgu = guests.filter((g) => gids.has(g.graduateId));
+          const cgu = guests.filter(
+            (g) =>
+              (g.graduateId != null && gids.has(g.graduateId)) ||
+              g.ceremonyId === c.id,
+          );
           const checkedIn = cgu.filter((g) => g.status === "checked_in").length;
           const invited = cgu.filter(
             (g) => g.status === "invited" || g.status === "checked_in",
@@ -248,6 +278,59 @@ export function ReportsPanel({
           Los reportes se exportan como CSV (compatible con Excel y Google
           Sheets).
         </p>
+      </div>
+
+      {/* Resumen visual */}
+      <div className="grid gap-5 rounded-xl border border-border bg-card p-5 shadow-sm sm:grid-cols-[1.4fr_1fr]">
+        <div>
+          <p className="mb-3 text-sm font-medium text-foreground">
+            Resumen{selectedName ? ` · ${selectedName}` : " · todas las ceremonias"}
+          </p>
+          <BarList
+            formatValue={formatNumber}
+            items={[
+              {
+                label: "Participantes registrados",
+                value: sumRegistered,
+                tone: "info",
+              },
+              { label: "Invitados", value: sumInvited, tone: "primary" },
+              {
+                label: "Ingresos validados",
+                value: sumCheckedIn,
+                tone: "success",
+              },
+            ]}
+          />
+        </div>
+        <div className="flex items-center justify-around gap-4 border-t border-border pt-5 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+          <div className="flex flex-col items-center gap-1.5">
+            <DonutStat
+              value={sumCheckedIn}
+              total={sumInvited || null}
+              tone="success"
+              sublabel="asistencia"
+              size={96}
+            />
+            <p className="text-xs text-muted-foreground">Asistencia</p>
+          </div>
+          <dl className="space-y-1.5 text-sm">
+            <div className="flex items-center gap-2">
+              <span aria-hidden className="size-2 rounded-full bg-success" />
+              <dt className="text-muted-foreground">Permitidos</dt>
+              <dd className="font-semibold tabular-nums text-foreground">
+                {formatNumber(sumAllowed)}
+              </dd>
+            </div>
+            <div className="flex items-center gap-2">
+              <span aria-hidden className="size-2 rounded-full bg-destructive" />
+              <dt className="text-muted-foreground">Rechazados</dt>
+              <dd className="font-semibold tabular-nums text-foreground">
+                {formatNumber(sumDenied)}
+              </dd>
+            </div>
+          </dl>
+        </div>
       </div>
 
       {/* Report cards */}

@@ -1,9 +1,34 @@
 # Security model — UPB Ceremonias
 
-> Última auditoría: 2026-05-21 — OWASP Top 10:2025 + Supabase best practices
+> Última auditoría: 2026-06-15 — OWASP Top 10:2025 + Supabase best practices
+> Endurecimiento aplicado: REVOKE de RPC sensibles, rate-limit distribuido,
+> CAPTCHA (Turnstile), CSP con host de Turnstile + Storage.
 
 Este documento describe las decisiones de seguridad de la plataforma, qué
 está cubierto y qué queda pendiente para producción.
+
+---
+
+## ⚠️ Acciones urgentes pendientes (debe hacerlas una persona)
+
+Estas no se pueden automatizar desde el código — requieren acceso a los
+paneles de Supabase / Vercel / Cloudflare:
+
+1. **🔴 ROTAR claves expuestas.** `SUPABASE_SERVICE_ROLE_KEY` y
+   `RESEND_API_KEY` se compartieron en texto plano durante el desarrollo.
+   Rótalas y actualiza las env vars en Vercel:
+   - Supabase → Settings → API → "Reset service_role key".
+   - Resend → API Keys → revocar la actual y crear una nueva.
+2. **Activar "Leaked Password Protection"** en Supabase → Auth → Policies
+   (chequea contraseñas contra HaveIBeenPwned). Gratis, 1 clic.
+3. **(Opcional, recomendado) Activar Upstash + Turnstile** pegando las env
+   vars (abajo). Sin ellas, el rate-limit cae a memoria y el CAPTCHA se
+   omite — la app funciona igual, solo con menos defensa a escala.
+4. **Activar CAPTCHA en Supabase Auth** (Settings → Auth → Bot & Abuse
+   Protection → Turnstile) con el mismo secret de Turnstile, para que el
+   login de staff exija el token que el formulario ya envía.
+5. **Vercel Deployment Protection** — proteger los preview deployments para
+   que no sean públicos (Vercel → Project → Settings → Deployment Protection).
 
 ---
 
@@ -29,7 +54,7 @@ eso, usamos OTP por correo + cookie HttpOnly de 30 min.
 
 | Header | Valor | Mitiga |
 |---|---|---|
-| `Content-Security-Policy` | Estricto, solo `'self'` + Supabase + fonts.google | XSS, click-jacking |
+| `Content-Security-Policy` | `'self'` + Supabase + fonts.google + Turnstile (`challenges.cloudflare.com` en script/frame/connect); `img-src` incluye host de Supabase Storage; `worker-src 'self'` | XSS, click-jacking |
 | `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | Downgrade attacks |
 | `X-Content-Type-Options` | `nosniff` | MIME confusion |
 | `X-Frame-Options` | `DENY` | Click-jacking |
@@ -49,12 +74,18 @@ eso, usamos OTP por correo + cookie HttpOnly de 30 min.
 
 Cada endpoint POST/PUT aplica en orden:
 
-1. **Rate limit IP** (`lib/security/rate-limit.ts`) — 5-60 req/min según endpoint
+1. **Rate limit IP** (`lib/security/rate-limit.ts`) — 5-60 req/min según endpoint.
+   **Distribuido**: usa Upstash Redis si `UPSTASH_REDIS_REST_*` están
+   configuradas (límite global entre instancias serverless); cae a memoria
+   por-proceso si no. Si Redis está configurado pero inaccesible → fail-open
+   a memoria (el rate-limit en BD del OTP es el respaldo duro).
 2. **CSRF** (`lib/security/csrf.ts`) — verifica `Origin` + `Sec-Fetch-Site`
-3. **Validación zod** (`lib/security/schemas.ts`) — esquema estricto del body
-4. **Auth** — `getUser()` de Supabase o validación de cookie graduado
-5. **Verificación de rol** — defense-in-depth aunque RLS también lo bloquea
-6. **Operación** — vía función `SECURITY DEFINER` para atomicidad
+3. **CAPTCHA** (`lib/security/captcha.ts`) — Turnstile en `send-otp` (y login
+   de staff vía Supabase Auth). No-op si Turnstile no está configurado.
+4. **Validación zod** (`lib/security/schemas.ts`) — esquema estricto del body
+5. **Auth** — `getUser()` de Supabase o validación de cookie graduado
+6. **Verificación de rol** — defense-in-depth aunque RLS también lo bloquea
+7. **Operación** — vía función `SECURITY DEFINER` para atomicidad
 
 ### Capa 4 — Base de datos (PostgreSQL + RLS)
 
@@ -70,15 +101,35 @@ Cada endpoint POST/PUT aplica en orden:
 | `audit_log` | admin read |
 | `graduate_sessions` | **nadie** (REVOKE total — solo funciones SECURITY DEFINER) |
 
-#### Funciones SECURITY DEFINER
+#### Funciones SECURITY DEFINER + exposición en el API REST
 
-| Función | Razón |
-|---|---|
-| `validate_qr_token` | `LOCK ROW` + `UPDATE` + `INSERT scan_event` atómico |
-| `graduate_generate_otp` | Rate-limit por documento + bcrypt hash |
-| `graduate_verify_otp` | Verifica hash + mint token + invalida tras éxito |
-| `is_staff(roles[])` | Evita recursión en políticas RLS |
-| `get_invitation_by_token` | Anon callable, expone solo 1 invitado |
+PostgREST expone como `/rest/v1/rpc/<fn>` cualquier función del schema
+`public` con `EXECUTE`. El endurecimiento (`20260520000006_security_hardening.sql`)
+cierra ese hueco: cada función solo concede `EXECUTE` a quien realmente la
+llama. El `service_role` (usado por nuestras rutas API) nunca se ve afectado.
+
+| Función | Atomicidad / razón | Quién puede ejecutarla |
+|---|---|---|
+| `graduate_generate_otp` | Rate-limit por documento + bcrypt hash | **solo `service_role`** |
+| `graduate_verify_otp` | Verifica hash + mint token + invalida tras éxito | **solo `service_role`** |
+| `graduate_from_session` / `graduate_revoke_session` | Resuelve/invalida sesión de graduando | **solo `service_role`** |
+| `get_invitation_by_token` | Expone 1 invitado por token | **solo `service_role`** |
+| `validate_qr_token` | `LOCK ROW` + `UPDATE` + `INSERT scan_event` atómico | **solo `service_role`** |
+| `get_overview_stats` / `get_ceremony_stats` | Agregados que saltan RLS | **solo `service_role`** |
+| `is_staff(roles[])` / `is_event_organizer(id)` | Evita recursión en políticas RLS | `authenticated` (lo exige RLS) |
+| `touch_user_login` | Marca `last_sign_in_at` | `authenticated` (login client-side; usa `auth.uid()`, ignora el input) |
+
+Funciones trigger (`audit_row_change`, `handle_new_auth_user`,
+`enforce_guest_quota`, `touch_updated_at`) tienen `EXECUTE` revocado de
+`anon`/`authenticated`/`public` — se disparan con los privilegios del dueño
+de la tabla, así que nadie puede invocarlas directamente por RPC (p.ej. para
+inyectar entradas falsas en el audit log).
+
+> Verificación: `curl` directo a `/rest/v1/rpc/graduate_generate_otp` con la
+> anon key responde `401 permission denied`. Las advertencias restantes del
+> linter de Supabase (`is_staff`, `is_event_organizer`, `touch_user_login`)
+> son intencionales: RLS y el login las necesitan, y solo devuelven un
+> booleano sobre el propio llamante (sin fuga de datos).
 
 #### Constraints/Invariantes
 
@@ -119,6 +170,26 @@ Ver [`.env.example`](../.env.example) para la lista completa.
 - `NEXT_PUBLIC_SUPABASE_URL` — público por diseño (CORS-protected)
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — público por diseño (RLS-protected)
 - `NEXT_PUBLIC_APP_URL` — solo para construir links absolutos en correos
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — *(opcional)* site key pública de Turnstile
+
+**Opcionales** (activan defensa extra; sin ellas la app funciona igual):
+- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` — rate-limit
+  distribuido. Sin ellas → rate-limit en memoria por-proceso.
+- `TURNSTILE_SECRET_KEY` — verificación server-side del CAPTCHA. Sin ella →
+  el CAPTCHA se omite (no-op).
+
+> Todas las opcionales tienen *fallback seguro*: el deploy nunca se rompe por
+> faltar una credencial. Se "activan" en cuanto se pegan en Vercel.
+
+#### Fotos de participantes (`participant-photos`, bucket público)
+
+Se mantiene **público a propósito**: la foto se muestra en la invitación que
+reciben los invitados (correo + página pública por token), donde una URL
+firmada que expira rompería la imagen. El riesgo de enumeración es nulo: la
+ruta del objeto es `{graduateId}.{ext}` y `graduateId` es `grd_` + un UUID
+completo (128 bits de entropía), el bucket no permite *listing* anónimo, y la
+escritura está restringida al `service_role` detrás de auth de graduando +
+validación de *magic bytes* + tope de 2 MB.
 
 ---
 
@@ -188,16 +259,30 @@ Como `authenticated` con un usuario scanner:
 
 ## Pendientes para producción (próxima iteración)
 
+### ✅ Hecho en esta iteración (2026-06-15)
+
+- ~~Migrar rate limit a Upstash~~ → **hecho** (con fallback a memoria).
+- ~~Esconder RPC sensibles del API REST~~ → **hecho** (REVOKE EXECUTE).
+- ~~CAPTCHA en OTP/login~~ → **hecho** (Turnstile, con fallback no-op).
+- ~~Bloquear funciones trigger por RPC~~ → **hecho**.
+- ~~`npm audit fix`~~ → **hecho** (quedan 2 moderate de postcss vía Next, ver A06).
+
 ### 🟠 Importante (no bloquea lanzamiento, sí antes de escala)
 
-- **Migrar rate limit a Upstash Redis / Vercel KV** — actual es per-process,
-  no escala horizontalmente en serverless.
-- **CSP con nonces** — actualmente `script-src 'unsafe-inline'` por Next.js
-  hydration shims. Posible migrar a nonces con `next-safe-middleware`.
+- **CSP con nonces** — *decisión tomada: NO migrar por ahora.* Según los docs
+  de Next 16, los nonces fuerzan render dinámico en TODAS las páginas (sin
+  optimización estática, sin CDN cache, sin PPR) y `style-src 'nonce'` rompe
+  los estilos inline de React. La app no renderiza HTML controlado por el
+  usuario en el DOM (el único `dangerouslySetInnerHTML` es un SVG de QR
+  generado localmente), así que el beneficio no justifica el costo. Revisar
+  si eso cambia.
 - **Logging estructurado** — agregar Sentry o Pino para tracking de errores
   con contexto. Hoy es `console.error` plano.
 - **WAF** — si UPB usa Cloudflare/Vercel Pro, activar reglas básicas
   (bot fight, rate limit por endpoint, OWASP CRS).
+- **Mover `citext` fuera de `public`** — advertencia del linter de Supabase
+  (`extension_in_public`). Bajo riesgo; requiere recrear columnas que dependen
+  del tipo, hacerlo en una migración cuidadosa.
 - **Penetration test externo** — antes del primer evento grande.
 
 ### 🟢 Nice-to-have

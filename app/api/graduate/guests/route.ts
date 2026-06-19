@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
 
-  const rl = rateLimit(request, "graduate-guests-write", {
+  const rl = await rateLimit(request, "graduate-guests-write", {
     max: 30,
     windowMs: 60_000,
   });

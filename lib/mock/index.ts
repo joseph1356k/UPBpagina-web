@@ -60,6 +60,14 @@ export async function getNextCeremony(): Promise<Ceremony | null> {
   return upcoming[0] ?? null;
 }
 
+/** Events opted into the public catalog (/eventos) and open for registration. */
+export async function getPublicEvents(): Promise<Ceremony[]> {
+  await delay();
+  return ceremoniesSeed
+    .filter((c) => c.publicListed && c.status === "open")
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 /* ------------------------------------------------------------------ */
 /*  Graduates                                                         */
 /* ------------------------------------------------------------------ */
@@ -139,7 +147,11 @@ export async function getGuests(args: GetGuestsArgs = {}): Promise<Guest[]> {
         .filter((g) => g.ceremonyId === args.ceremonyId)
         .map((g) => g.id),
     );
-    result = result.filter((g) => gradIds.has(g.graduateId));
+    result = result.filter(
+      (g) =>
+        (g.graduateId != null && gradIds.has(g.graduateId)) ||
+        g.ceremonyId === args.ceremonyId,
+    );
   }
   if (args.status) {
     result = result.filter((g) => g.status === args.status);
@@ -208,10 +220,16 @@ export async function getCeremonyStats(
   await delay();
   const gs = graduatesSeed.filter((g) => g.ceremonyId === ceremonyId);
   const gradIds = new Set(gs.map((g) => g.id));
-  const gsts = guestsSeed.filter((g) => gradIds.has(g.graduateId));
+  const gsts = guestsSeed.filter(
+    (g) =>
+      (g.graduateId != null && gradIds.has(g.graduateId)) ||
+      g.ceremonyId === ceremonyId,
+  );
+  const ceremony = ceremoniesSeed.find((c) => c.id === ceremonyId);
 
   return {
     ceremonyId,
+    capacity: ceremony?.capacity ?? null,
     graduatesCount: gs.length,
     graduatesRegistered: gs.filter(
       (g) => g.status === "registered" || g.status === "completed",
@@ -282,15 +300,18 @@ export async function getGuestsAdmin(
   await delay();
 
   let result: GuestAdminRow[] = guestsSeed.map((g) => {
-    const grad = graduatesSeed.find((gr) => gr.id === g.graduateId);
-    const cer = grad
-      ? ceremoniesSeed.find((c) => c.id === grad.ceremonyId)
+    const grad = g.graduateId
+      ? graduatesSeed.find((gr) => gr.id === g.graduateId)
+      : undefined;
+    const cerId = grad?.ceremonyId ?? g.ceremonyId ?? "";
+    const cer = cerId
+      ? ceremoniesSeed.find((c) => c.id === cerId)
       : undefined;
     return {
       ...g,
       graduateName: grad?.fullName ?? "—",
       graduateProgram: grad?.program ?? "—",
-      ceremonyId: grad?.ceremonyId ?? "",
+      ceremonyId: cerId,
       ceremonyName: cer?.name ?? "—",
     };
   });
@@ -376,6 +397,7 @@ export async function getEventTypes(
     invitePhrase: t.invitePhrase,
     photoRecommended: t.photoRecommended,
     defaultTemplate: t.defaultTemplate,
+    defaultRegistrationMode: t.defaultRegistrationMode,
     customFields: t.customFields ?? [],
     isBuiltin: true,
     active: true,
@@ -383,10 +405,20 @@ export async function getEventTypes(
   }));
 }
 
+/** In-memory organizer assignments for mock mode (ceremonyId → userIds). */
+const eventOrganizers: Record<string, string[]> = {};
+
 export async function getEventOrganizerIds(ceremonyId: string): Promise<string[]> {
   await delay();
-  void ceremonyId; // mock has no organizer assignments
-  return [];
+  return eventOrganizers[ceremonyId] ?? [];
+}
+
+export async function setEventOrganizers(
+  ceremonyId: string,
+  userIds: string[],
+): Promise<void> {
+  await delay();
+  eventOrganizers[ceremonyId] = [...userIds];
 }
 
 export type CreateUserInput = Omit<User, "id" | "createdAt" | "lastSignInAt">;
@@ -509,7 +541,8 @@ export async function bulkCreateGraduates(
 
 export interface InvitationView {
   guest: Guest;
-  graduate: Graduate;
+  /** null for self-registered attendees (no participant). */
+  graduate: Graduate | null;
   ceremony: Ceremony;
   /** Reason the QR cannot be used right now, if any. */
   blocked?: "revoked" | "ceremony_completed";
@@ -521,9 +554,13 @@ export async function getInvitationByToken(
   await delay();
   const guest = guestsSeed.find((g) => g.invitationToken === token);
   if (!guest) return null;
-  const graduate = graduatesSeed.find((g) => g.id === guest.graduateId);
-  if (!graduate) return null;
-  const ceremony = ceremoniesSeed.find((c) => c.id === graduate.ceremonyId);
+  const graduate = guest.graduateId
+    ? graduatesSeed.find((g) => g.id === guest.graduateId) ?? null
+    : null;
+  const ceremonyId = graduate?.ceremonyId ?? guest.ceremonyId;
+  const ceremony = ceremonyId
+    ? ceremoniesSeed.find((c) => c.id === ceremonyId) ?? null
+    : null;
   if (!ceremony) return null;
 
   let blocked: InvitationView["blocked"];
@@ -535,12 +572,93 @@ export async function getInvitationByToken(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Self-registration (public RSVP)                                    */
+/* ------------------------------------------------------------------ */
+
+export interface RegisterAttendeeResult {
+  ok: boolean;
+  error?: string;
+  already?: boolean;
+  guestId?: string;
+  token?: string;
+  fullName?: string;
+}
+
+export async function registerAttendee(
+  ceremonyId: string,
+  input: { fullName: string; email: string; document?: string | null },
+): Promise<RegisterAttendeeResult> {
+  await delay();
+  const cer = ceremoniesSeed.find((c) => c.id === ceremonyId);
+  if (!cer) return { ok: false, error: "not_found" };
+  // Effective mode mirrors lib/terminology.effectiveRegistrationMode: an
+  // explicit mode wins, else legacy events fall back to publicListed.
+  const mode =
+    cer.registrationMode ?? (cer.publicListed ? "self_service" : "invitation");
+  if (mode !== "self_service") return { ok: false, error: "not_public" };
+  if (
+    cer.status !== "open" ||
+    new Date(cer.registrationClosesAt).getTime() < Date.now()
+  ) {
+    return { ok: false, error: "closed" };
+  }
+
+  // Idempotent per email.
+  const existing = guestsSeed.find(
+    (g) =>
+      g.ceremonyId === ceremonyId &&
+      g.email != null &&
+      g.email.toLowerCase() === input.email.toLowerCase() &&
+      g.status !== "revoked",
+  );
+  if (existing) {
+    return {
+      ok: true,
+      already: true,
+      guestId: existing.id,
+      token: existing.invitationToken,
+      fullName: existing.fullName,
+    };
+  }
+
+  if (cer.capacity != null) {
+    const count = guestsSeed.filter(
+      (g) => g.ceremonyId === ceremonyId && g.status !== "revoked",
+    ).length;
+    if (count >= cer.capacity) return { ok: false, error: "full" };
+  }
+
+  const now = new Date().toISOString();
+  const id = `gst_self_${Date.now()}`;
+  const token = crypto.randomUUID().replace(/-/g, "");
+  const guest: Guest = {
+    id,
+    graduateId: null,
+    ceremonyId,
+    fullName: input.fullName,
+    documentNumber: input.document ?? null,
+    email: input.email,
+    relationship: null,
+    status: "invited",
+    invitationToken: token,
+    invitedAt: now,
+    checkedInAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  guestsSeed.push(guest);
+  return { ok: true, already: false, guestId: id, token, fullName: input.fullName };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Scanner simulation                                                 */
 /* ------------------------------------------------------------------ */
 
 export interface SimulatedScanResult {
   result: ScanResult;
   reason: ScanDeniedReason | null;
+  /** Non-blocking warning (e.g. admitted while over capacity). */
+  warning?: ScanDeniedReason | null;
   guest: Guest | null;
   graduate: Graduate | null;
   ceremonyName: string | null;
@@ -571,7 +689,9 @@ export async function simulateScan(args: {
       )
     : null;
   const inPool = (g: Guest) =>
-    ceremonyGradIds ? ceremonyGradIds.has(g.graduateId) : true;
+    ceremonyGradIds
+      ? g.graduateId != null && ceremonyGradIds.has(g.graduateId)
+      : true;
 
   let result: ScanResult = "allowed";
   let reason: ScanDeniedReason | null = null;
@@ -657,6 +777,151 @@ export async function simulateScan(args: {
   scanEventsSeed.unshift(scanEvent);
 
   return { result, reason, guest, graduate, ceremonyName, scanEvent };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Manual check-in (scanner fallback — search by name / document)    */
+/* ------------------------------------------------------------------ */
+
+export interface GuestSearchRow {
+  id: string;
+  fullName: string;
+  documentNumber: string | null;
+  email: string | null;
+  relationship: string | null;
+  status: GuestStatus;
+  graduateName: string;
+}
+
+export async function searchCeremonyGuests(args: {
+  ceremonyId: string;
+  query?: string;
+}): Promise<GuestSearchRow[]> {
+  await delay();
+  const gradIds = new Set(
+    graduatesSeed
+      .filter((g) => g.ceremonyId === args.ceremonyId)
+      .map((g) => g.id),
+  );
+  let rows = guestsSeed.filter(
+    (g) =>
+      (g.graduateId != null && gradIds.has(g.graduateId)) ||
+      g.ceremonyId === args.ceremonyId,
+  );
+
+  const q = (args.query ?? "").trim().toLowerCase();
+  if (q) {
+    const qDigits = q.replace(/\D/g, "");
+    rows = rows.filter(
+      (g) =>
+        g.fullName.toLowerCase().includes(q) ||
+        (qDigits.length > 0 && (g.documentNumber ?? "").includes(qDigits)),
+    );
+  }
+
+  return rows.slice(0, 20).map((g) => {
+    const grad = graduatesSeed.find((gr) => gr.id === g.graduateId);
+    return {
+      id: g.id,
+      fullName: g.fullName,
+      documentNumber: g.documentNumber,
+      email: g.email,
+      relationship: g.relationship,
+      status: g.status,
+      graduateName: grad?.fullName ?? "—",
+    };
+  });
+}
+
+export async function manualCheckIn(args: {
+  guestId: string;
+  scannedByUserId: string;
+}): Promise<SimulatedScanResult> {
+  await delay();
+  const now = new Date().toISOString();
+  const idx = guestsSeed.findIndex((g) => g.id === args.guestId);
+
+  let result: ScanResult = "allowed";
+  let reason: ScanDeniedReason | null = null;
+  let guest: Guest | null = idx >= 0 ? guestsSeed[idx] : null;
+
+  if (idx < 0) {
+    result = "denied";
+    reason = "not_found";
+  } else if (guestsSeed[idx].status === "revoked") {
+    result = "denied";
+    reason = "revoked";
+  } else if (guestsSeed[idx].status === "checked_in") {
+    result = "denied";
+    reason = "already_used";
+  } else {
+    guestsSeed[idx] = {
+      ...guestsSeed[idx],
+      status: "checked_in",
+      checkedInAt: now,
+      updatedAt: now,
+    };
+    guest = guestsSeed[idx];
+  }
+
+  const graduate =
+    guest && guest.graduateId
+      ? graduatesSeed.find((g) => g.id === guest!.graduateId) ?? null
+      : null;
+  const cerId = graduate?.ceremonyId ?? guest?.ceremonyId ?? null;
+  const ceremonyName = cerId
+    ? ceremoniesSeed.find((c) => c.id === cerId)?.name ?? null
+    : null;
+
+  const scanEvent: ScanEvent = {
+    id: `scn_${Date.now()}`,
+    guestId: guest?.id ?? null,
+    scannedByUserId: args.scannedByUserId,
+    scannedAt: now,
+    result,
+    reason,
+  };
+  scanEventsSeed.unshift(scanEvent);
+
+  return { result, reason, guest, graduate, ceremonyName, scanEvent };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Offline scan manifest (B4 — pre-downloaded event guest list)       */
+/* ------------------------------------------------------------------ */
+
+export interface ManifestEntry {
+  token: string;
+  name: string;
+  status: GuestStatus;
+}
+
+export interface ScanManifest {
+  ceremonyId: string;
+  generatedAt: string;
+  entries: ManifestEntry[];
+}
+
+/** Full token list for an event so the scanner can decide offline. */
+export async function getScanManifest(ceremonyId: string): Promise<ScanManifest> {
+  await delay();
+  const gradIds = new Set(
+    graduatesSeed
+      .filter((g) => g.ceremonyId === ceremonyId)
+      .map((g) => g.id),
+  );
+  const entries = guestsSeed
+    .filter(
+      (g) =>
+        (g.graduateId != null && gradIds.has(g.graduateId)) ||
+        g.ceremonyId === ceremonyId,
+    )
+    .map((g) => ({
+      token: g.invitationToken,
+      name: g.fullName,
+      status: g.status,
+    }));
+  return { ceremonyId, generatedAt: new Date().toISOString(), entries };
 }
 
 /* ------------------------------------------------------------------ */

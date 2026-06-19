@@ -6,11 +6,15 @@ import {
   Camera,
   CameraOff,
   CheckCircle2,
+  Download,
   History,
   Keyboard,
   Loader2,
   RotateCcw,
   ScanLine,
+  Search,
+  UserRound,
+  WifiOff,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,13 +29,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// Mock simulator only used when NEXT_PUBLIC_USE_SUPABASE is off.
-import { simulateScan } from "@/lib/mock";
-import { ROUTES, SCAN_DENIED_REASON_LABEL } from "@/lib/constants";
-import { formatDocument, formatInitials, formatTime } from "@/lib/format";
+// Mock data fns only used when NEXT_PUBLIC_USE_SUPABASE is off.
+import {
+  getScanManifest as mockGetManifest,
+  manualCheckIn as mockManualCheckIn,
+  searchCeremonyGuests as mockSearchGuests,
+  simulateScan,
+} from "@/lib/mock";
+import {
+  GUEST_STATUS_LABEL,
+  ROUTES,
+  SCAN_DENIED_REASON_LABEL,
+} from "@/lib/constants";
+import {
+  formatDocument,
+  formatInitials,
+  formatRelativeFromNow,
+  formatTime,
+} from "@/lib/format";
 import { useOnline } from "@/lib/pwa/use-online";
 import { enqueueScan } from "@/lib/pwa/scan-queue";
+import {
+  hasOfflineCheckIn,
+  loadManifest,
+  recordOfflineCheckIn,
+  saveManifest,
+  type StoredManifest,
+} from "@/lib/pwa/manifest";
 import { USE_SUPABASE } from "@/lib/supabase/env";
+import type { GuestSearchRow } from "@/lib/mock";
 import type { Ceremony, ScanDeniedReason, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +70,10 @@ interface Props {
 interface ScanOutcome {
   result: "allowed" | "denied" | "queued";
   reason: ScanDeniedReason | null;
+  /** Non-blocking warning (e.g. admitted while over capacity). */
+  warning?: ScanDeniedReason | null;
+  /** Decided locally against the offline manifest (will reconcile later). */
+  offline?: boolean;
   guestName: string | null;
   guestDocument: string | null;
   graduateName: string | null;
@@ -78,11 +108,20 @@ export function ScannerUI({ operator, ceremonies }: Props) {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualValue, setManualValue] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [searchResults, setSearchResults] = useState<GuestSearchRow[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [manifest, setManifest] = useState<StoredManifest | null>(null);
+  const [preparing, setPreparing] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   // Guards re-entry while a validation is in flight (camera keeps firing)
   const busyRef = useRef(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest manifest, read inside validateToken without being a dep.
+  const manifestRef = useRef<StoredManifest | null>(null);
 
   const operatorName = operator?.fullName ?? "Operador";
   const activeCeremony = ceremonies.find((c) => c.id === ceremonyId);
@@ -106,6 +145,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
           finishScan({
             result: r.result === "allowed" ? "allowed" : "denied",
             reason: r.reason,
+            warning: r.warning ?? null,
             guestName: r.guest?.fullName ?? null,
             guestDocument: r.guest?.documentNumber ?? null,
             graduateName: r.graduate?.fullName ?? null,
@@ -115,7 +155,42 @@ export function ScannerUI({ operator, ceremonies }: Props) {
         }
 
         if (!online) {
-          // Offline: queue the token; it flushes automatically on reconnect
+          const offlineManifest = manifestRef.current;
+          // Offline V2: decide locally against the pre-downloaded manifest.
+          if (offlineManifest) {
+            const entry = offlineManifest.entries.find((e) => e.token === token);
+            let result: "allowed" | "denied" = "allowed";
+            let reason: ScanDeniedReason | null = null;
+            if (!entry) {
+              result = "denied";
+              reason = "not_found";
+            } else if (entry.status === "revoked") {
+              result = "denied";
+              reason = "revoked";
+            } else if (
+              entry.status === "checked_in" ||
+              (await hasOfflineCheckIn(token))
+            ) {
+              result = "denied";
+              reason = "already_used";
+            }
+            if (result === "allowed") {
+              await recordOfflineCheckIn(token, ceremonyId);
+              await enqueueScan(token); // reconcile with the server on reconnect
+            }
+            finishScan({
+              result,
+              reason,
+              offline: true,
+              guestName: entry?.name ?? null,
+              guestDocument: null,
+              graduateName: null,
+              ceremonyName: activeCeremony?.name ?? null,
+            });
+            return;
+          }
+
+          // No manifest downloaded → blind queue (legacy fallback).
           try {
             await enqueueScan(token);
             finishScan({
@@ -149,6 +224,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
         const json = (await res.json().catch(() => ({}))) as {
           result?: "allowed" | "denied";
           reason?: ScanDeniedReason | null;
+          warning?: ScanDeniedReason | null;
           guestName?: string | null;
           graduateId?: string | null;
           error?: string;
@@ -169,6 +245,7 @@ export function ScannerUI({ operator, ceremonies }: Props) {
         finishScan({
           result: json.result,
           reason: json.reason ?? null,
+          warning: json.warning ?? null,
           guestName: json.guestName ?? null,
           guestDocument: null,
           graduateName: null,
@@ -241,8 +318,60 @@ export function ScannerUI({ operator, ceremonies }: Props) {
     return () => {
       scannerRef.current?.destroy();
       scannerRef.current = null;
+      if (searchTimer.current) clearTimeout(searchTimer.current);
     };
   }, []);
+
+  /* ── Offline manifest (B4) ───────────────────────────────────────── */
+
+  // Load any cached manifest for the active ceremony.
+  useEffect(() => {
+    let active = true;
+    void loadManifest(ceremonyId).then((m) => {
+      if (!active) return;
+      manifestRef.current = m;
+      setManifest(m);
+    });
+    return () => {
+      active = false;
+    };
+  }, [ceremonyId]);
+
+  const prepareOffline = useCallback(async () => {
+    if (!ceremonyId) return;
+    setPreparing(true);
+    try {
+      let m: {
+        ceremonyId: string;
+        generatedAt: string;
+        entries: { token: string; name: string; status: string }[];
+      } | null = null;
+      if (!USE_SUPABASE) {
+        m = await mockGetManifest(ceremonyId);
+      } else {
+        const res = await fetch(
+          `/api/qr/manifest?ceremony=${encodeURIComponent(ceremonyId)}`,
+          { credentials: "same-origin" },
+        );
+        const json = (await res.json().catch(() => ({}))) as {
+          manifest?: {
+            ceremonyId: string;
+            generatedAt: string;
+            entries: { token: string; name: string; status: string }[];
+          };
+        };
+        m = json.manifest ?? null;
+      }
+      if (m && Array.isArray(m.entries)) {
+        await saveManifest(m);
+        const stored = await loadManifest(ceremonyId);
+        manifestRef.current = stored;
+        setManifest(stored);
+      }
+    } finally {
+      setPreparing(false);
+    }
+  }, [ceremonyId]);
 
   /* ── Manual entry ─────────────────────────────────────────────────── */
 
@@ -257,6 +386,115 @@ export function ScannerUI({ operator, ceremonies }: Props) {
     setManualValue("");
     void validateToken(token);
   }
+
+  /* ── Search by name + manual check-in ────────────────────────────── */
+
+  const runSearch = useCallback(
+    async (q: string): Promise<GuestSearchRow[]> => {
+      if (!USE_SUPABASE) return mockSearchGuests({ ceremonyId, query: q });
+      const res = await fetch(
+        `/api/qr/search?ceremony=${encodeURIComponent(ceremonyId)}&q=${encodeURIComponent(q)}`,
+        { credentials: "same-origin" },
+      );
+      const json = (await res.json().catch(() => ({}))) as {
+        results?: GuestSearchRow[];
+      };
+      return Array.isArray(json.results) ? json.results : [];
+    },
+    [ceremonyId],
+  );
+
+  // Debounce in the change handler (not an effect) so search stays off the
+  // render path.
+  function onSearchChange(value: string) {
+    setSearchValue(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const q = value.trim();
+    if (q.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    searchTimer.current = setTimeout(async () => {
+      try {
+        setSearchResults(await runSearch(q));
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+  }
+
+  const manualCheckInGuest = useCallback(
+    async (guestId: string) => {
+      if (busyRef.current) return;
+      busyRef.current = true;
+      setSearchOpen(false);
+      setSearchValue("");
+      setSearchResults([]);
+      setState({ kind: "validating" });
+
+      try {
+        if (!USE_SUPABASE) {
+          const r = await mockManualCheckIn({
+            guestId,
+            scannedByUserId: operator?.id ?? "usr_scan_demo",
+          });
+          finishScan({
+            result: r.result === "allowed" ? "allowed" : "denied",
+            reason: r.reason,
+            warning: r.warning ?? null,
+            guestName: r.guest?.fullName ?? null,
+            guestDocument: r.guest?.documentNumber ?? null,
+            graduateName: r.graduate?.fullName ?? null,
+            ceremonyName: r.ceremonyName,
+          });
+          return;
+        }
+
+        const res = await fetch("/api/qr/manual-check-in", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ guestId }),
+        });
+        const json = (await res.json().catch(() => ({}))) as {
+          result?: "allowed" | "denied";
+          reason?: ScanDeniedReason | null;
+          warning?: ScanDeniedReason | null;
+          guestName?: string | null;
+          guestDocument?: string | null;
+          graduateName?: string | null;
+          ceremonyName?: string | null;
+        };
+        if (!res.ok || !json.result) {
+          finishScan({
+            result: "denied",
+            reason: (json.reason as ScanDeniedReason) ?? "not_found",
+            guestName: json.guestName ?? null,
+            guestDocument: null,
+            graduateName: null,
+            ceremonyName: activeCeremony?.name ?? null,
+          });
+          return;
+        }
+        finishScan({
+          result: json.result,
+          reason: json.reason ?? null,
+          warning: json.warning ?? null,
+          guestName: json.guestName ?? null,
+          guestDocument: json.guestDocument ?? null,
+          graduateName: json.graduateName ?? null,
+          ceremonyName: json.ceremonyName ?? activeCeremony?.name ?? null,
+        });
+      } finally {
+        busyRef.current = false;
+      }
+    },
+    [operator?.id, activeCeremony?.name],
+  );
 
   const showingCamera = state.kind === "camera" || state.kind === "validating";
 
@@ -331,6 +569,39 @@ export function ScannerUI({ operator, ceremonies }: Props) {
               {formatTime(activeCeremony.startTime)}
             </p>
           )}
+        </div>
+
+        {/* Offline readiness (B4) */}
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {manifest ? (
+              <CheckCircle2 className="size-4 shrink-0 text-success" />
+            ) : (
+              <WifiOff className="size-4 shrink-0 text-background/45" />
+            )}
+            <p className="truncate text-xs text-background/70">
+              {manifest
+                ? `Listo sin conexión · ${formatRelativeFromNow(new Date(manifest.savedAt).toISOString())}`
+                : online
+                  ? "Prepara el modo sin conexión antes del evento"
+                  : "Sin conexión y sin lista descargada"}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => void prepareOffline()}
+            disabled={preparing || !online || !ceremonyId}
+            className="shrink-0 text-background/80 hover:bg-white/10 hover:text-background"
+          >
+            {preparing ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Download className="size-3.5" />
+            )}
+            {manifest ? "Actualizar" : "Preparar"}
+          </Button>
         </div>
 
         {/* Viewfinder */}
@@ -437,7 +708,10 @@ export function ScannerUI({ operator, ceremonies }: Props) {
           {state.kind !== "result" && (
             <button
               type="button"
-              onClick={() => setManualOpen((v) => !v)}
+              onClick={() => {
+                setManualOpen((v) => !v);
+                setSearchOpen(false);
+              }}
               className="mx-auto flex items-center gap-1.5 text-xs text-background/60 underline-offset-4 hover:text-background hover:underline"
             >
               <Keyboard className="size-3.5" />
@@ -458,6 +732,93 @@ export function ScannerUI({ operator, ceremonies }: Props) {
                 Validar
               </Button>
             </form>
+          )}
+
+          {/* Search-by-name toggle (manual check-in without QR) */}
+          {state.kind !== "result" && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchOpen((v) => !v);
+                setManualOpen(false);
+              }}
+              className="mx-auto flex items-center gap-1.5 text-xs text-background/60 underline-offset-4 hover:text-background hover:underline"
+            >
+              <Search className="size-3.5" />
+              Buscar invitado por nombre
+            </button>
+          )}
+
+          {searchOpen && state.kind !== "result" && (
+            <div className="space-y-2">
+              <Input
+                value={searchValue}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Nombre o documento del invitado"
+                className="h-10 border-white/15 bg-white/5 text-background placeholder:text-background/40"
+                autoFocus
+              />
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-white/10">
+                {searching ? (
+                  <p className="px-3 py-4 text-center text-sm text-background/60">
+                    Buscando…
+                  </p>
+                ) : searchResults.length === 0 ? (
+                  <p className="px-3 py-4 text-center text-sm text-background/50">
+                    {searchValue.trim().length < 2
+                      ? "Escribe al menos 2 caracteres."
+                      : "Sin coincidencias."}
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-white/10">
+                    {searchResults.map((g) => {
+                      const admitted = g.status === "checked_in";
+                      const blocked = g.status === "revoked";
+                      const disabled = admitted || blocked;
+                      return (
+                        <li key={g.id}>
+                          <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => void manualCheckInGuest(g.id)}
+                            className={cn(
+                              "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                              disabled
+                                ? "cursor-not-allowed opacity-60"
+                                : "hover:bg-white/5",
+                            )}
+                          >
+                            <UserRound className="size-4 shrink-0 text-background/50" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-background">
+                                {g.fullName}
+                              </p>
+                              <p className="truncate text-xs text-background/55">
+                                {g.documentNumber
+                                  ? formatDocument(g.documentNumber)
+                                  : g.graduateName}
+                              </p>
+                            </div>
+                            <span
+                              className={cn(
+                                "shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-medium",
+                                admitted
+                                  ? "bg-success/15 text-success"
+                                  : blocked
+                                    ? "bg-destructive/15 text-destructive"
+                                    : "bg-white/10 text-background/70",
+                              )}
+                            >
+                              {GUEST_STATUS_LABEL[g.status]}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
@@ -573,6 +934,8 @@ function ScanResultCard({
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={cn(
         "rounded-2xl border p-5",
         isAllowed
@@ -626,6 +989,20 @@ function ScanResultCard({
           )}
         </div>
       </div>
+
+      {data.warning === "capacity_full" && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+          <AlertTriangle className="size-4 shrink-0" />
+          Aforo superado — ingreso permitido por excepción.
+        </div>
+      )}
+
+      {data.offline && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-background/70">
+          <WifiOff className="size-4 shrink-0" />
+          Validado sin conexión — se sincronizará al reconectar.
+        </div>
+      )}
 
       {/* Guest info */}
       {guestName ? (

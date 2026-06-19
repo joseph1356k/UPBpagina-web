@@ -38,6 +38,9 @@ export const ROUTES = {
   adminTipos: "/admin/tipos",
   adminConfiguracion: "/admin/configuracion",
 
+  // Public catalog
+  eventos: "/eventos",
+
   // Public invitation
   invitacion: "/invitacion",
 
@@ -125,6 +128,7 @@ export const SCAN_DENIED_REASON_LABEL: Record<ScanDeniedReason, string> = {
   outside_time_window: "Fuera de horario",
   revoked: "Invitación revocada",
   not_found: "QR no encontrado",
+  capacity_full: "Aforo lleno",
 };
 
 /* ------------------------------------------------------------------ */

@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { QrCode } from "@/components/shared/qr-code";
 import { UpbShield } from "@/components/shared/upb-shield";
 import { GuestStatusBadge } from "@/components/shared/status-badge";
+import { AddToCalendar } from "@/components/shared/add-to-calendar";
 import { PRODUCT } from "@/lib/constants";
 import { formatDateLong, formatTime } from "@/lib/format";
 import { cap, getTerminology } from "@/lib/terminology";
@@ -53,7 +54,9 @@ export function InvitationView({ view, token }: Props) {
     if (navigator.share) {
       navigator
         .share({
-          title: `Invitación de ${graduate.fullName}`,
+          title: graduate
+            ? `Invitación de ${graduate.fullName}`
+            : `Mi pase · ${ceremony.name}`,
           url,
         })
         .catch(() => {});
@@ -84,7 +87,7 @@ export function InvitationView({ view, token }: Props) {
       {/* Greeting */}
       <header className="flex items-start gap-4">
         {/* Optional participant photo */}
-        {graduate.photoUrl ? (
+        {graduate?.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={graduate.photoUrl}
@@ -101,7 +104,9 @@ export function InvitationView({ view, token }: Props) {
             ,
           </p>
           <h1 className="mt-1 font-serif text-2xl font-semibold leading-tight text-foreground md:text-[1.7rem]">
-            {graduate.fullName.split(" ").slice(0, 2).join(" ")} {terms.invitePhrase}.
+            {graduate
+              ? `${graduate.fullName.split(" ").slice(0, 2).join(" ")} ${terms.invitePhrase}.`
+              : "Tu pase de ingreso está listo."}
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
             Guarda esta invitación — la necesitarás para ingresar el día del
@@ -154,7 +159,7 @@ export function InvitationView({ view, token }: Props) {
         <p className="mt-1 font-serif text-lg font-semibold text-foreground">
           {guest.fullName}
         </p>
-        {guest.relationship && (
+        {guest.relationship && graduate && (
           <p className="text-xs text-muted-foreground">
             De {graduate.fullName} · {guest.relationship}
           </p>
@@ -219,6 +224,7 @@ export function InvitationView({ view, token }: Props) {
             <Download className="size-4" />
             Guardar / Imprimir
           </Button>
+          <AddToCalendar event={ceremony} className="flex-1" />
         </div>
       )}
 

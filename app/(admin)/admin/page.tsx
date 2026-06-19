@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   ArrowUpRight,
+  BarChart3,
   CalendarCheck,
   CheckCircle2,
   History,
@@ -14,6 +15,9 @@ import {
 import { CeremonyStatusBadge, ScanResultBadge } from "@/components/shared/status-badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { StatCard } from "@/components/shared/stat-card";
+import { BarList } from "@/components/shared/charts/bar-list";
+import { DonutStat } from "@/components/shared/charts/donut-stat";
+import { Sparkline } from "@/components/shared/charts/sparkline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +33,7 @@ import {
   getCeremonyStats,
   getNextCeremony,
   getOverviewStats,
-  getScanEvents,
+  getScanEventsAdmin,
   getUsers,
 } from "@/lib/data";
 
@@ -38,15 +42,18 @@ export const metadata = {
 };
 
 export default async function AdminDashboardPage() {
-  const [stats, nextCer, audit, scans, users] = await Promise.all([
+  const [stats, nextCer, audit, scansAll, users] = await Promise.all([
     getOverviewStats(),
     getNextCeremony(),
     getAuditLog({ limit: 6 }),
-    getScanEvents({ limit: 5 }),
+    getScanEventsAdmin(),
     getUsers(),
   ]);
   const cerStats = nextCer ? await getCeremonyStats(nextCer.id) : null;
   const userById = new Map(users.map((u) => [u.id, u]));
+  const scans = scansAll.slice(0, 5);
+  const scanBuckets = scanBucketsLast24h(scansAll);
+  const scans24h = scanBuckets.reduce((a, b) => a + b, 0);
 
   return (
     <div className="flex flex-col gap-8">
@@ -104,6 +111,88 @@ export default async function AdminDashboardPage() {
           icon={CheckCircle2}
           accent="success"
         />
+      </section>
+
+      {/* Analítica */}
+      <section aria-label="Analítica" className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <BarChart3 className="size-4 text-muted-foreground" />
+              Embudo de registro
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BarList
+              formatValue={formatNumber}
+              items={[
+                {
+                  label: "Participantes registrados",
+                  value: stats.graduatesRegistered,
+                  tone: "info",
+                },
+                {
+                  label: "Invitaciones con QR",
+                  value: stats.totalGuestsInvited,
+                  tone: "primary",
+                },
+                {
+                  label: "Ingresos validados",
+                  value: stats.totalCheckedIn,
+                  tone: "success",
+                },
+              ]}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Ocupación · próximo evento</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-center gap-4 py-2">
+            {nextCer && cerStats && cerStats.capacity != null ? (
+              <>
+                <DonutStat
+                  value={cerStats.guestsCheckedIn}
+                  total={cerStats.capacity}
+                  tone="success"
+                  sublabel="aforo"
+                />
+                <div>
+                  <p className="font-serif text-2xl font-semibold tabular-nums text-foreground">
+                    {formatNumber(cerStats.guestsCheckedIn)}
+                    <span className="text-muted-foreground">
+                      /{formatNumber(cerStats.capacity)}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">ingresos / aforo</p>
+                </div>
+              </>
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                {nextCer
+                  ? "El próximo evento no tiene aforo definido."
+                  : "No hay eventos próximos."}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Escaneos (24 h)</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col justify-center gap-3 py-2">
+            <Sparkline
+              data={scanBuckets}
+              label="Escaneos por hora en las últimas 24 horas"
+            />
+            <p className="text-xs text-muted-foreground">
+              {formatNumber(scans24h)} escaneos en las últimas 24 horas
+            </p>
+          </CardContent>
+        </Card>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.8fr_1fr]">
@@ -190,34 +279,32 @@ export default async function AdminDashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-col p-0">
-            {scans.map((scan, idx) => {
-              const operator = userById.get(scan.scannedByUserId);
-              return (
-                <div
-                  key={scan.id}
-                  className={`flex items-center gap-3 px-4 py-3 ${
-                    idx < scans.length - 1 ? "border-b border-border/60" : ""
-                  }`}
-                >
-                  <ScanResultBadge result={scan.result} showDot />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-foreground">
-                      {scan.result === "allowed"
-                        ? `Invitado ${scan.guestId ?? "#sin id"} ingresó`
-                        : `Rechazo: ${
-                            scan.reason
-                              ? SCAN_DENIED_REASON_LABEL[scan.reason]
-                              : "motivo no especificado"
-                          }`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {operator?.fullName ?? "Operador desconocido"} ·{" "}
-                      {formatRelativeFromNow(scan.scannedAt)}
-                    </p>
-                  </div>
+            {scans.map((scan, idx) => (
+              <div
+                key={scan.id}
+                className={`flex items-center gap-3 px-4 py-3 ${
+                  idx < scans.length - 1 ? "border-b border-border/60" : ""
+                }`}
+              >
+                <ScanResultBadge result={scan.result} showDot />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-foreground">
+                    {scan.result === "allowed"
+                      ? `${scan.guestName ?? "Invitado"} ingresó`
+                      : `Rechazo: ${
+                          scan.reason
+                            ? SCAN_DENIED_REASON_LABEL[scan.reason]
+                            : "motivo no especificado"
+                        }`}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {scan.scannedByName}
+                    {scan.ceremonyName ? ` · ${scan.ceremonyName}` : ""} ·{" "}
+                    {formatRelativeFromNow(scan.scannedAt)}
+                  </p>
                 </div>
-              );
-            })}
+              </div>
+            ))}
             {scans.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-muted-foreground">
                 Sin escaneos recientes.
@@ -355,6 +442,19 @@ function ProgressItem({
       </p>
     </div>
   );
+}
+
+/** Scans per hour over the last 24 h (24 buckets; index 23 = current hour). */
+function scanBucketsLast24h(scans: { scannedAt: string }[]): number[] {
+  const now = Date.now();
+  const buckets = Array.from({ length: 24 }, () => 0);
+  for (const s of scans) {
+    const hoursAgo = Math.floor(
+      (now - new Date(s.scannedAt).getTime()) / 3_600_000,
+    );
+    if (hoursAgo >= 0 && hoursAgo < 24) buckets[23 - hoursAgo] += 1;
+  }
+  return buckets;
 }
 
 function QuickActions() {

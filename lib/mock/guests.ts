@@ -64,6 +64,7 @@ function generate(): Guest[] {
       result.push({
         id: `gst_${String(id).padStart(4, "0")}`,
         graduateId: grd.id,
+        ceremonyId: null,
         fullName: name.fullName,
         documentNumber: includeDocument ? buildDocument(seed) : null,
         email: includeEmail ? buildPersonalEmail(name.fullName, seed) : null,

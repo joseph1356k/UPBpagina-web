@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/lib/constants";
 
 const NAV_LINKS = [
+  { label: "Eventos", href: "/eventos" },
   { label: "Cómo funciona", href: "/#como-funciona" },
   { label: "Para administradores", href: "/#admin" },
   { label: "Soporte", href: "/#soporte" },
@@ -15,6 +16,12 @@ const NAV_LINKS = [
 export function PublicHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/70 bg-background/85 backdrop-blur-md">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+      >
+        Saltar al contenido
+      </a>
       {/* Gold accent line — UPB institutional touch */}
       <div
         aria-hidden

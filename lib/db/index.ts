@@ -24,6 +24,7 @@ import type {
   GraduateStatus,
   Guest,
   GuestStatus,
+  RegistrationMode,
   ScanEvent,
   ScanResult,
   User,
@@ -88,6 +89,18 @@ export async function getNextCeremony(): Promise<Ceremony | null> {
     .maybeSingle();
   if (error) throw error;
   return data ? ceremonyFromRow(data) : null;
+}
+
+export async function getPublicEvents(): Promise<Ceremony[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ceremonies")
+    .select("*")
+    .eq("public_listed", true)
+    .eq("status", "open")
+    .order("date");
+  if (error) throw error;
+  return (data ?? []).map(ceremonyFromRow);
 }
 
 /* ────────────────────────────────────────────────────────────────────
@@ -276,7 +289,10 @@ export async function getAuditLog(
 export async function getCeremonyStats(
   ceremonyId: string,
 ): Promise<CeremonyStats> {
-  const supabase = await createClient();
+  // SECURITY DEFINER global aggregate, called only from staff-gated server
+  // pages. Uses the service client so the RPC can be hidden from the public
+  // REST API (EXECUTE revoked from anon + authenticated).
+  const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("get_ceremony_stats", {
     p_ceremony_id: ceremonyId,
   });
@@ -295,7 +311,8 @@ export interface OverviewStats {
 }
 
 export async function getOverviewStats(): Promise<OverviewStats> {
-  const supabase = await createClient();
+  // See getCeremonyStats — service client so the RPC stays off the public API.
+  const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("get_overview_stats");
   if (error) throw error;
   return data as unknown as OverviewStats;
@@ -325,11 +342,21 @@ export async function getGuestsAdmin(
   let q = supabase
     .from("guests")
     .select(
-      "*, graduates!inner(full_name, program, ceremony_id, ceremonies!inner(name))",
+      "*, graduates(full_name, program, ceremony_id, ceremonies(name)), event:ceremonies(name)",
     );
 
   if (args.status) q = q.eq("status", args.status);
-  if (args.ceremonyId) q = q.eq("graduates.ceremony_id", args.ceremonyId);
+  if (args.ceremonyId) {
+    // Guests of this event's participants OR self-registered directly to it.
+    const { data: grads } = await supabase
+      .from("graduates")
+      .select("id")
+      .eq("ceremony_id", args.ceremonyId);
+    const gradIds = (grads ?? []).map((g) => g.id);
+    const parts = [`ceremony_id.eq.${args.ceremonyId}`];
+    if (gradIds.length > 0) parts.push(`graduate_id.in.(${gradIds.join(",")})`);
+    q = q.or(parts.join(","));
+  }
   if (args.query) {
     const term = args.query.replace(/[%_]/g, "");
     q = q.or(
@@ -341,13 +368,22 @@ export async function getGuestsAdmin(
   if (error) throw error;
 
   return (data ?? []).map((row) => {
-    const grad = (row as unknown as { graduates: { full_name: string; program: string; ceremony_id: string; ceremonies: { name: string } } }).graduates;
+    const r = row as unknown as {
+      graduates: {
+        full_name: string;
+        program: string;
+        ceremony_id: string;
+        ceremonies: { name: string } | null;
+      } | null;
+      event: { name: string } | null;
+    };
+    const mapped = guestFromRow(row);
     return {
-      ...guestFromRow(row),
-      graduateName: grad.full_name,
-      graduateProgram: grad.program,
-      ceremonyId: grad.ceremony_id,
-      ceremonyName: grad.ceremonies.name,
+      ...mapped,
+      graduateName: r.graduates?.full_name ?? "—",
+      graduateProgram: r.graduates?.program ?? "—",
+      ceremonyId: r.graduates?.ceremony_id ?? mapped.ceremonyId ?? "",
+      ceremonyName: r.graduates?.ceremonies?.name ?? r.event?.name ?? "—",
     };
   });
 }
@@ -383,6 +419,10 @@ export async function createCeremony(
       status: data.status,
       registration_closes_at: data.registrationClosesAt,
       max_guests_default: data.maxGuestsDefault,
+      capacity: data.capacity,
+      public_listed: data.publicListed,
+      capacity_enforce: data.capacityEnforce,
+      registration_mode: data.registrationMode,
       custom_data: data.customData ?? {},
     })
     .select()
@@ -414,6 +454,13 @@ export async function updateCeremony(
     update.registration_closes_at = patch.registrationClosesAt;
   if (patch.maxGuestsDefault !== undefined)
     update.max_guests_default = patch.maxGuestsDefault;
+  if (patch.capacity !== undefined) update.capacity = patch.capacity;
+  if (patch.publicListed !== undefined)
+    update.public_listed = patch.publicListed;
+  if (patch.capacityEnforce !== undefined)
+    update.capacity_enforce = patch.capacityEnforce;
+  if (patch.registrationMode !== undefined)
+    update.registration_mode = patch.registrationMode;
   if (patch.customData !== undefined) update.custom_data = patch.customData;
 
   const { data: row, error } = await supabase
@@ -452,6 +499,7 @@ export interface CreateEventTypeInput {
   invitePhrase: string;
   photoRecommended: boolean;
   defaultTemplate: string;
+  defaultRegistrationMode: RegistrationMode;
   customFields?: CustomFieldDef[];
   sortOrder?: number;
 }
@@ -476,6 +524,7 @@ export async function createEventType(
       invite_phrase: data.invitePhrase,
       photo_recommended: data.photoRecommended,
       default_template: data.defaultTemplate,
+      default_registration_mode: data.defaultRegistrationMode,
       custom_fields: (data.customFields ?? []) as unknown,
       is_builtin: false,
       sort_order: data.sortOrder ?? 200,
@@ -508,6 +557,8 @@ export async function updateEventType(
     update.photo_recommended = patch.photoRecommended;
   if (patch.defaultTemplate !== undefined)
     update.default_template = patch.defaultTemplate;
+  if (patch.defaultRegistrationMode !== undefined)
+    update.default_registration_mode = patch.defaultRegistrationMode;
   if (patch.customFields !== undefined)
     update.custom_fields = patch.customFields as unknown;
   if (patch.active !== undefined) update.active = patch.active;
@@ -757,7 +808,8 @@ export async function revokeGuestAdmin(id: string): Promise<Guest> {
 
 export interface InvitationView {
   guest: Guest;
-  graduate: Graduate;
+  /** null for self-registered attendees (no participant). */
+  graduate: Graduate | null;
   ceremony: Ceremony;
   blocked?: "revoked" | "ceremony_completed";
 }
@@ -801,26 +853,20 @@ export async function getInvitationByToken(
   const rpc = data as unknown as RawInvitationRpc | null;
   if (!rpc) return null;
 
-  // Fetch the full rows by id (service role → no RLS).
-  const [guestRes, gradRes, cerRes] = await Promise.all([
+  // Fetch the full rows by id (service role → no RLS). The SQL function
+  // already resolved the ceremony (COALESCE of the guest's direct event or
+  // its participant's event), so trust rpc.ceremony.id.
+  const [guestRes, cerRes] = await Promise.all([
     service.from("guests").select("*").eq("id", rpc.guest.id).maybeSingle(),
-    service
-      .from("graduates")
-      .select("*")
-      .eq("ceremony_id", rpc.ceremony.id)
-      .eq("full_name", rpc.graduate.fullName)
-      .limit(1)
-      .maybeSingle(),
     service.from("ceremonies").select("*").eq("id", rpc.ceremony.id).maybeSingle(),
   ]);
-  if (guestRes.error || gradRes.error || cerRes.error) {
-    return null;
-  }
-  if (!guestRes.data || !gradRes.data || !cerRes.data) return null;
+  if (guestRes.error || cerRes.error) return null;
+  if (!guestRes.data || !cerRes.data) return null;
 
   const guest = guestFromRow(guestRes.data);
-  const graduate = graduateFromRow(gradRes.data);
   const ceremony = ceremonyFromRow(cerRes.data);
+  // Self-registered guests have no participant.
+  const graduate = guest.graduateId ? await getGraduate(guest.graduateId) : null;
 
   let blocked: InvitationView["blocked"];
   if (guest.status === "revoked") blocked = "revoked";
@@ -828,6 +874,34 @@ export async function getInvitationByToken(
     blocked = "ceremony_completed";
 
   return { guest, graduate, ceremony, blocked };
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Self-registration (public RSVP) — atomic RPC
+   ──────────────────────────────────────────────────────────────────── */
+
+export interface RegisterAttendeeResult {
+  ok: boolean;
+  error?: string;
+  already?: boolean;
+  guestId?: string;
+  token?: string;
+  fullName?: string;
+}
+
+export async function registerAttendee(
+  ceremonyId: string,
+  input: { fullName: string; email: string; document?: string | null },
+): Promise<RegisterAttendeeResult> {
+  const service = createServiceClient();
+  const { data, error } = await service.rpc("register_attendee", {
+    p_ceremony_id: ceremonyId,
+    p_full_name: input.fullName,
+    p_email: input.email,
+    p_document: input.document ?? null,
+  });
+  if (error) throw error;
+  return data as unknown as RegisterAttendeeResult;
 }
 
 /* ────────────────────────────────────────────────────────────────────
@@ -839,6 +913,8 @@ import type { ScanDeniedReason } from "@/lib/types";
 export interface SimulatedScanResult {
   result: ScanResult;
   reason: ScanDeniedReason | null;
+  /** Non-blocking warning (e.g. admitted while over capacity). */
+  warning?: ScanDeniedReason | null;
   guest: Guest | null;
   graduate: Graduate | null;
   ceremonyName: string | null;
@@ -850,6 +926,7 @@ interface QrValidateRpc {
   reason: ScanDeniedReason | null;
   guestName: string | null;
   graduateId: string | null;
+  warning?: ScanDeniedReason | null;
 }
 
 /**
@@ -868,7 +945,10 @@ export async function simulateScan(args: {
       "[db] simulateScan requires a real QR `token` in Supabase mode.",
     );
   }
-  const supabase = await createClient();
+  // The live scanner path is POST /api/qr/validate (also service-client).
+  // validate_qr_token verifies the scanner role internally, so it stays
+  // hidden from the public REST API (EXECUTE revoked from anon+authenticated).
+  const supabase = createServiceClient();
   const { data, error } = await supabase.rpc("validate_qr_token", {
     p_token: args.token,
     p_scanner_id: args.scannedByUserId,
@@ -908,11 +988,183 @@ export async function simulateScan(args: {
   return {
     result: rpc.result,
     reason: rpc.reason,
+    warning: rpc.warning ?? null,
     guest,
     graduate,
     ceremonyName: ceremony?.name ?? null,
     scanEvent,
   };
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Manual check-in (scanner fallback — search by name / document)
+   ──────────────────────────────────────────────────────────────────── */
+
+export interface GuestSearchRow {
+  id: string;
+  fullName: string;
+  documentNumber: string | null;
+  email: string | null;
+  relationship: string | null;
+  status: GuestStatus;
+  graduateName: string;
+}
+
+export async function searchCeremonyGuests(args: {
+  ceremonyId: string;
+  query?: string;
+}): Promise<GuestSearchRow[]> {
+  const supabase = await createClient();
+
+  // Participants of this event → so we also match guests they registered.
+  const { data: grads } = await supabase
+    .from("graduates")
+    .select("id")
+    .eq("ceremony_id", args.ceremonyId);
+  const gradIds = (grads ?? []).map((g) => g.id);
+
+  let q = supabase
+    .from("guests")
+    .select(
+      "id, full_name, document_number, email, relationship, status, graduates(full_name)",
+    )
+    .limit(20);
+
+  const ownership = [`ceremony_id.eq.${args.ceremonyId}`];
+  if (gradIds.length > 0) ownership.push(`graduate_id.in.(${gradIds.join(",")})`);
+  q = q.or(ownership.join(","));
+
+  const term = (args.query ?? "").replace(/[%_]/g, "").trim();
+  if (term) {
+    const digits = term.replace(/\D/g, "");
+    q = q.or(
+      `full_name.ilike.%${term}%,document_number.ilike.%${digits || term}%`,
+    );
+  }
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const r = row as unknown as {
+      id: string;
+      full_name: string;
+      document_number: string | null;
+      email: string | null;
+      relationship: string | null;
+      status: GuestStatus;
+      graduates: { full_name: string } | null;
+    };
+    return {
+      id: r.id,
+      fullName: r.full_name,
+      documentNumber: r.document_number,
+      email: r.email,
+      relationship: r.relationship,
+      status: r.status,
+      graduateName: r.graduates?.full_name ?? "—",
+    };
+  });
+}
+
+export async function manualCheckIn(args: {
+  guestId: string;
+  scannedByUserId: string;
+}): Promise<SimulatedScanResult> {
+  // Atomic check-in by guest id (see manual_check_in SQL). Service client so
+  // the SECURITY DEFINER fn stays off the public REST API; the API route has
+  // already verified the scanner's role.
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.rpc("manual_check_in", {
+    p_guest_id: args.guestId,
+    p_scanner_id: args.scannedByUserId,
+  });
+  if (error) throw error;
+  const rpc = data as unknown as QrValidateRpc;
+
+  const guest = rpc.guestName
+    ? ({
+        id: args.guestId,
+        graduateId: rpc.graduateId ?? "",
+        fullName: rpc.guestName,
+        documentNumber: null,
+        email: null,
+        relationship: null,
+        status: rpc.result === "allowed" ? "checked_in" : "invited",
+        invitationToken: "",
+        invitedAt: null,
+        checkedInAt: rpc.result === "allowed" ? new Date().toISOString() : null,
+        createdAt: "",
+        updatedAt: "",
+      } as Guest)
+    : null;
+
+  const graduate = rpc.graduateId ? await getGraduate(rpc.graduateId) : null;
+  const ceremony = graduate ? await getCeremony(graduate.ceremonyId) : null;
+
+  const scanEvent: ScanEvent = {
+    id: `scn_${Date.now()}`,
+    guestId: guest?.id ?? null,
+    scannedByUserId: args.scannedByUserId,
+    scannedAt: new Date().toISOString(),
+    result: rpc.result,
+    reason: rpc.reason,
+  };
+
+  return {
+    result: rpc.result,
+    reason: rpc.reason,
+    warning: rpc.warning ?? null,
+    guest,
+    graduate,
+    ceremonyName: ceremony?.name ?? null,
+    scanEvent,
+  };
+}
+
+/* ────────────────────────────────────────────────────────────────────
+   Offline scan manifest (B4 — pre-downloaded event guest list)
+   ──────────────────────────────────────────────────────────────────── */
+
+export interface ManifestEntry {
+  token: string;
+  name: string;
+  status: GuestStatus;
+}
+
+export interface ScanManifest {
+  ceremonyId: string;
+  generatedAt: string;
+  entries: ManifestEntry[];
+}
+
+export async function getScanManifest(ceremonyId: string): Promise<ScanManifest> {
+  const supabase = await createClient();
+  // Participants of this event → include their guests + self-registered guests.
+  const { data: grads } = await supabase
+    .from("graduates")
+    .select("id")
+    .eq("ceremony_id", ceremonyId);
+  const gradIds = (grads ?? []).map((g) => g.id);
+
+  let q = supabase
+    .from("guests")
+    .select("invitation_token, full_name, status")
+    .limit(5000);
+  const ownership = [`ceremony_id.eq.${ceremonyId}`];
+  if (gradIds.length > 0) ownership.push(`graduate_id.in.(${gradIds.join(",")})`);
+  q = q.or(ownership.join(","));
+
+  const { data, error } = await q;
+  if (error) throw error;
+  const entries = (data ?? []).map((row) => {
+    const r = row as unknown as {
+      invitation_token: string;
+      full_name: string;
+      status: GuestStatus;
+    };
+    return { token: r.invitation_token, name: r.full_name, status: r.status };
+  });
+  return { ceremonyId, generatedAt: new Date().toISOString(), entries };
 }
 
 /* ────────────────────────────────────────────────────────────────────

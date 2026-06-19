@@ -17,13 +17,15 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "mock_mode" }, { status: 501 });
   }
 
-  const rl = rateLimit(request, "admin-guests-revoke", { max: 60, windowMs: 60_000 });
+  const rl = await rateLimit(request, "admin-guests-revoke", { max: 60, windowMs: 60_000 });
   if (!rl.ok) return rl.response;
 
   const csrf = assertSameOrigin(request);
   if (!csrf.ok) return csrf.response;
 
-  const auth = await requireStaff(["admin", "coordinator"]);
+  // Organizers may revoke their own events' guests; RLS
+  // (guests_organizer_write) confines them to assigned events.
+  const auth = await requireStaff(["admin", "coordinator", "organizer"]);
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
