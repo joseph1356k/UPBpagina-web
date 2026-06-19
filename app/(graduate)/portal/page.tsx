@@ -18,6 +18,7 @@ import { GuestForm } from "@/components/graduate/guest-form";
 import { GuestStatusBadge } from "@/components/shared/status-badge";
 import { PhotoCard } from "@/components/graduate/photo-card";
 import { QuotaCard } from "@/components/graduate/quota-card";
+import { AddToCalendar } from "@/components/shared/add-to-calendar";
 import { SendInvitationsDialog } from "@/components/graduate/send-invitations-dialog";
 import { useGraduatePortal } from "@/components/graduate/auth-provider";
 import { ROUTES } from "@/lib/constants";
@@ -81,6 +82,13 @@ export default function PortalDashboard() {
                   <MapPin className="size-3.5 shrink-0" />
                   {ceremony.venue}, {ceremony.campus}
                 </span>
+              </div>
+              <div className="mt-3">
+                <AddToCalendar
+                  event={ceremony}
+                  variant="ghost"
+                  className="-ml-2.5 text-muted-foreground hover:text-foreground"
+                />
               </div>
             </div>
           </div>

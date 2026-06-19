@@ -52,6 +52,8 @@ export type {
   BulkImportResult,
   GuestSearchRow,
   RegisterAttendeeResult,
+  ManifestEntry,
+  ScanManifest,
 } from "@/lib/mock";
 
 /* ──────────────────────────────────────────────────────────────────
@@ -124,6 +126,7 @@ export const simulateScan          = route("simulateScan");
 export const searchCeremonyGuests  = route("searchCeremonyGuests");
 export const manualCheckIn         = route("manualCheckIn");
 export const registerAttendee      = route("registerAttendee");
+export const getScanManifest       = route("getScanManifest");
 
 /* ──────────────────────────────────────────────────────────────────
    Mutations — server-only. Client components use lib/api-client.

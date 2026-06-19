@@ -6,6 +6,7 @@ import {
   Camera,
   CameraOff,
   CheckCircle2,
+  Download,
   History,
   Keyboard,
   Loader2,
@@ -13,6 +14,7 @@ import {
   ScanLine,
   Search,
   UserRound,
+  WifiOff,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -29,6 +31,7 @@ import {
 } from "@/components/ui/select";
 // Mock data fns only used when NEXT_PUBLIC_USE_SUPABASE is off.
 import {
+  getScanManifest as mockGetManifest,
   manualCheckIn as mockManualCheckIn,
   searchCeremonyGuests as mockSearchGuests,
   simulateScan,
@@ -38,9 +41,21 @@ import {
   ROUTES,
   SCAN_DENIED_REASON_LABEL,
 } from "@/lib/constants";
-import { formatDocument, formatInitials, formatTime } from "@/lib/format";
+import {
+  formatDocument,
+  formatInitials,
+  formatRelativeFromNow,
+  formatTime,
+} from "@/lib/format";
 import { useOnline } from "@/lib/pwa/use-online";
 import { enqueueScan } from "@/lib/pwa/scan-queue";
+import {
+  hasOfflineCheckIn,
+  loadManifest,
+  recordOfflineCheckIn,
+  saveManifest,
+  type StoredManifest,
+} from "@/lib/pwa/manifest";
 import { USE_SUPABASE } from "@/lib/supabase/env";
 import type { GuestSearchRow } from "@/lib/mock";
 import type { Ceremony, ScanDeniedReason, User } from "@/lib/types";
@@ -57,6 +72,8 @@ interface ScanOutcome {
   reason: ScanDeniedReason | null;
   /** Non-blocking warning (e.g. admitted while over capacity). */
   warning?: ScanDeniedReason | null;
+  /** Decided locally against the offline manifest (will reconcile later). */
+  offline?: boolean;
   guestName: string | null;
   guestDocument: string | null;
   graduateName: string | null;
@@ -95,12 +112,16 @@ export function ScannerUI({ operator, ceremonies }: Props) {
   const [searchValue, setSearchValue] = useState("");
   const [searchResults, setSearchResults] = useState<GuestSearchRow[]>([]);
   const [searching, setSearching] = useState(false);
+  const [manifest, setManifest] = useState<StoredManifest | null>(null);
+  const [preparing, setPreparing] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   // Guards re-entry while a validation is in flight (camera keeps firing)
   const busyRef = useRef(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Latest manifest, read inside validateToken without being a dep.
+  const manifestRef = useRef<StoredManifest | null>(null);
 
   const operatorName = operator?.fullName ?? "Operador";
   const activeCeremony = ceremonies.find((c) => c.id === ceremonyId);
@@ -134,7 +155,42 @@ export function ScannerUI({ operator, ceremonies }: Props) {
         }
 
         if (!online) {
-          // Offline: queue the token; it flushes automatically on reconnect
+          const offlineManifest = manifestRef.current;
+          // Offline V2: decide locally against the pre-downloaded manifest.
+          if (offlineManifest) {
+            const entry = offlineManifest.entries.find((e) => e.token === token);
+            let result: "allowed" | "denied" = "allowed";
+            let reason: ScanDeniedReason | null = null;
+            if (!entry) {
+              result = "denied";
+              reason = "not_found";
+            } else if (entry.status === "revoked") {
+              result = "denied";
+              reason = "revoked";
+            } else if (
+              entry.status === "checked_in" ||
+              (await hasOfflineCheckIn(token))
+            ) {
+              result = "denied";
+              reason = "already_used";
+            }
+            if (result === "allowed") {
+              await recordOfflineCheckIn(token, ceremonyId);
+              await enqueueScan(token); // reconcile with the server on reconnect
+            }
+            finishScan({
+              result,
+              reason,
+              offline: true,
+              guestName: entry?.name ?? null,
+              guestDocument: null,
+              graduateName: null,
+              ceremonyName: activeCeremony?.name ?? null,
+            });
+            return;
+          }
+
+          // No manifest downloaded → blind queue (legacy fallback).
           try {
             await enqueueScan(token);
             finishScan({
@@ -265,6 +321,57 @@ export function ScannerUI({ operator, ceremonies }: Props) {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
   }, []);
+
+  /* ── Offline manifest (B4) ───────────────────────────────────────── */
+
+  // Load any cached manifest for the active ceremony.
+  useEffect(() => {
+    let active = true;
+    void loadManifest(ceremonyId).then((m) => {
+      if (!active) return;
+      manifestRef.current = m;
+      setManifest(m);
+    });
+    return () => {
+      active = false;
+    };
+  }, [ceremonyId]);
+
+  const prepareOffline = useCallback(async () => {
+    if (!ceremonyId) return;
+    setPreparing(true);
+    try {
+      let m: {
+        ceremonyId: string;
+        generatedAt: string;
+        entries: { token: string; name: string; status: string }[];
+      } | null = null;
+      if (!USE_SUPABASE) {
+        m = await mockGetManifest(ceremonyId);
+      } else {
+        const res = await fetch(
+          `/api/qr/manifest?ceremony=${encodeURIComponent(ceremonyId)}`,
+          { credentials: "same-origin" },
+        );
+        const json = (await res.json().catch(() => ({}))) as {
+          manifest?: {
+            ceremonyId: string;
+            generatedAt: string;
+            entries: { token: string; name: string; status: string }[];
+          };
+        };
+        m = json.manifest ?? null;
+      }
+      if (m && Array.isArray(m.entries)) {
+        await saveManifest(m);
+        const stored = await loadManifest(ceremonyId);
+        manifestRef.current = stored;
+        setManifest(stored);
+      }
+    } finally {
+      setPreparing(false);
+    }
+  }, [ceremonyId]);
 
   /* ── Manual entry ─────────────────────────────────────────────────── */
 
@@ -462,6 +569,39 @@ export function ScannerUI({ operator, ceremonies }: Props) {
               {formatTime(activeCeremony.startTime)}
             </p>
           )}
+        </div>
+
+        {/* Offline readiness (B4) */}
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {manifest ? (
+              <CheckCircle2 className="size-4 shrink-0 text-success" />
+            ) : (
+              <WifiOff className="size-4 shrink-0 text-background/45" />
+            )}
+            <p className="truncate text-xs text-background/70">
+              {manifest
+                ? `Listo sin conexión · ${formatRelativeFromNow(new Date(manifest.savedAt).toISOString())}`
+                : online
+                  ? "Prepara el modo sin conexión antes del evento"
+                  : "Sin conexión y sin lista descargada"}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => void prepareOffline()}
+            disabled={preparing || !online || !ceremonyId}
+            className="shrink-0 text-background/80 hover:bg-white/10 hover:text-background"
+          >
+            {preparing ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <Download className="size-3.5" />
+            )}
+            {manifest ? "Actualizar" : "Preparar"}
+          </Button>
         </div>
 
         {/* Viewfinder */}
@@ -794,6 +934,8 @@ function ScanResultCard({
 
   return (
     <div
+      role="status"
+      aria-live="polite"
       className={cn(
         "rounded-2xl border p-5",
         isAllowed
@@ -852,6 +994,13 @@ function ScanResultCard({
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
           <AlertTriangle className="size-4 shrink-0" />
           Aforo superado — ingreso permitido por excepción.
+        </div>
+      )}
+
+      {data.offline && (
+        <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-background/70">
+          <WifiOff className="size-4 shrink-0" />
+          Validado sin conexión — se sincronizará al reconectar.
         </div>
       )}
 

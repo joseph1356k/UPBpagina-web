@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { QrCode } from "@/components/shared/qr-code";
 import { UpbShield } from "@/components/shared/upb-shield";
 import { GuestStatusBadge } from "@/components/shared/status-badge";
+import { AddToCalendar } from "@/components/shared/add-to-calendar";
 import { PRODUCT } from "@/lib/constants";
 import { formatDateLong, formatTime } from "@/lib/format";
 import { cap, getTerminology } from "@/lib/terminology";
@@ -223,6 +224,7 @@ export function InvitationView({ view, token }: Props) {
             <Download className="size-4" />
             Guardar / Imprimir
           </Button>
+          <AddToCalendar event={ceremony} className="flex-1" />
         </div>
       )}
 

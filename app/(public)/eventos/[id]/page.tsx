@@ -5,6 +5,7 @@ import { ArrowLeft, CalendarDays, Clock, MapPin, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RsvpForm } from "@/components/public/rsvp-form";
+import { AddToCalendar } from "@/components/shared/add-to-calendar";
 import { getCeremony } from "@/lib/data";
 import { ROUTES } from "@/lib/constants";
 import { formatDateLong, formatNumber, formatTime } from "@/lib/format";
@@ -76,6 +77,10 @@ export default async function EventoDetallePage({
           </Detail>
         )}
       </dl>
+
+      <div className="mt-5">
+        <AddToCalendar event={event} />
+      </div>
 
       {/* Registration — the RSVP form (A3) mounts here. */}
       <Card className="mt-8" id="registro">

@@ -1122,6 +1122,52 @@ export async function manualCheckIn(args: {
 }
 
 /* ────────────────────────────────────────────────────────────────────
+   Offline scan manifest (B4 — pre-downloaded event guest list)
+   ──────────────────────────────────────────────────────────────────── */
+
+export interface ManifestEntry {
+  token: string;
+  name: string;
+  status: GuestStatus;
+}
+
+export interface ScanManifest {
+  ceremonyId: string;
+  generatedAt: string;
+  entries: ManifestEntry[];
+}
+
+export async function getScanManifest(ceremonyId: string): Promise<ScanManifest> {
+  const supabase = await createClient();
+  // Participants of this event → include their guests + self-registered guests.
+  const { data: grads } = await supabase
+    .from("graduates")
+    .select("id")
+    .eq("ceremony_id", ceremonyId);
+  const gradIds = (grads ?? []).map((g) => g.id);
+
+  let q = supabase
+    .from("guests")
+    .select("invitation_token, full_name, status")
+    .limit(5000);
+  const ownership = [`ceremony_id.eq.${ceremonyId}`];
+  if (gradIds.length > 0) ownership.push(`graduate_id.in.(${gradIds.join(",")})`);
+  q = q.or(ownership.join(","));
+
+  const { data, error } = await q;
+  if (error) throw error;
+  const entries = (data ?? []).map((row) => {
+    const r = row as unknown as {
+      invitation_token: string;
+      full_name: string;
+      status: GuestStatus;
+    };
+    return { token: r.invitation_token, name: r.full_name, status: r.status };
+  });
+  return { ceremonyId, generatedAt: new Date().toISOString(), entries };
+}
+
+/* ────────────────────────────────────────────────────────────────────
    Reports — denormalized scan + audit (server-side joins)
    ──────────────────────────────────────────────────────────────────── */
 

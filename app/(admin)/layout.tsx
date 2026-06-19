@@ -13,17 +13,25 @@ export default async function AdminLayout({
     : null;
 
   return (
-    <div className="flex flex-1 min-h-0">
-      <AdminSidebar
-        className="hidden border-r border-sidebar-border md:flex"
-        user={user}
-      />
+    <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground"
+      >
+        Saltar al contenido
+      </a>
+      <div className="flex flex-1 min-h-0">
+        <AdminSidebar
+          className="hidden border-r border-sidebar-border md:flex"
+          user={user}
+        />
       <div className="flex min-w-0 flex-1 flex-col">
         <AdminTopbar user={user} />
         <main id="main-content" className="flex-1 overflow-y-auto bg-brand-surface/30 px-4 py-6 md:px-8 md:py-8">
           <div className="mx-auto w-full max-w-7xl">{children}</div>
         </main>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

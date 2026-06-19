@@ -887,6 +887,44 @@ export async function manualCheckIn(args: {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Offline scan manifest (B4 — pre-downloaded event guest list)       */
+/* ------------------------------------------------------------------ */
+
+export interface ManifestEntry {
+  token: string;
+  name: string;
+  status: GuestStatus;
+}
+
+export interface ScanManifest {
+  ceremonyId: string;
+  generatedAt: string;
+  entries: ManifestEntry[];
+}
+
+/** Full token list for an event so the scanner can decide offline. */
+export async function getScanManifest(ceremonyId: string): Promise<ScanManifest> {
+  await delay();
+  const gradIds = new Set(
+    graduatesSeed
+      .filter((g) => g.ceremonyId === ceremonyId)
+      .map((g) => g.id),
+  );
+  const entries = guestsSeed
+    .filter(
+      (g) =>
+        (g.graduateId != null && gradIds.has(g.graduateId)) ||
+        g.ceremonyId === ceremonyId,
+    )
+    .map((g) => ({
+      token: g.invitationToken,
+      name: g.fullName,
+      status: g.status,
+    }));
+  return { ceremonyId, generatedAt: new Date().toISOString(), entries };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Reports helpers                                                    */
 /* ------------------------------------------------------------------ */
 
